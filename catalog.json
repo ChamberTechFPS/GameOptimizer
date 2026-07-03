@@ -1,0 +1,8 @@
+{
+  "catalogVersion": "1.0.0",
+  "games": [
+    { "slug": "cs2", "version": "1.0.0", "files": ["manifest.json", "autoexec.cfg", "README.md"] },
+    { "slug": "fortnite", "version": "1.0.0", "files": ["manifest.json", "GameUserSettings.ini", "README.md"] },
+    { "slug": "valorant", "version": "1.0.0", "files": ["manifest.json", "guide.md"] }
+  ]
+}

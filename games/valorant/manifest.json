@@ -1,0 +1,7 @@
+{
+  "name": "Valorant",
+  "slug": "valorant",
+  "platform": "riot",
+  "guideOnly": true,
+  "detect": { "paths": ["C:/Riot Games/VALORANT", "{localappdata}/VALORANT"] }
+}

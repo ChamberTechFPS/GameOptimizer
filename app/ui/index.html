@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chamber Game Optimizer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="update-banner" class="banner hidden">
+    <span id="update-banner-text">New game configs available</span>
+    <button id="update-btn" class="btn btn-accent">Update configs</button>
+    <button id="update-dismiss" class="btn btn-ghost">Later</button>
+  </div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">⌁</span>
+      <div>
+        <h1>Chamber game optimizer</h1>
+        <span class="brand-sub">by ChamberTech · v<span id="app-version">0.1.0</span></span>
+      </div>
+    </div>
+    <button id="rescan-btn" class="btn">Rescan</button>
+  </header>
+
+  <section class="stats">
+    <div class="stat"><span class="stat-label">Detected</span><span class="stat-value" id="stat-detected">–</span></div>
+    <div class="stat"><span class="stat-label">Optimized</span><span class="stat-value ok" id="stat-optimized">–</span></div>
+    <div class="stat"><span class="stat-label">Drifted</span><span class="stat-value warn" id="stat-drifted">–</span></div>
+  </section>
+
+  <main id="game-list" class="list">
+    <p class="loading">Scanning your library…</p>
+  </main>
+
+  <footer class="footbar">
+    <span class="dot ok"></span> Anti-cheat safe · every change backed up · one-click revert
+  </footer>
+
+  <div id="modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h2>Update available</h2>
+      <p id="modal-text">A new version of Chamber Game Optimizer is out.</p>
+      <div class="modal-actions">
+        <button id="modal-download" class="btn btn-accent">Get it on GitHub</button>
+        <button id="modal-close" class="btn btn-ghost">Not now</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="main.js"></script>
+</body>
+</html>

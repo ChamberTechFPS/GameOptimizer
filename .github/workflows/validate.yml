@@ -1,0 +1,31 @@
+name: Validate manifests
+
+on: [push, pull_request]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ajv
+        run: npm install -g ajv-cli
+      - name: Validate game manifests against schema
+        run: |
+          for m in games/*/manifest.json; do
+            echo "Validating $m"
+            ajv validate -s schema/manifest.schema.json -d "$m" --strict=false
+          done
+      - name: Validate catalog.json
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          cat = json.load(open('catalog.json'))
+          assert 'catalogVersion' in cat
+          for g in cat['games']:
+              d = os.path.join('games', g['slug'])
+              assert os.path.isdir(d), f"missing folder {d}"
+              for f in g['files']:
+                  p = os.path.join(d, f)
+                  assert os.path.isfile(p), f"catalog lists missing file {p}"
+          print('catalog OK')
+          EOF
