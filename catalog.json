@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "1.0.0",
+  "catalogVersion": "1.1.0",
   "games": [
     {
       "slug": "cs2",
@@ -48,6 +48,24 @@
         {
           "name": "guide.md",
           "sha256": "B4CF4C1DE574C6AE30BE8B2977D626D2C1137F3CD7234DD3F1271B9064F27DDB"
+        }
+      ]
+    },
+    {
+      "slug": "rocket-league",
+      "version": "1.0.0",
+      "files": [
+        {
+          "name": "manifest.json",
+          "sha256": "6376AB66C2C28C04E8BF1635E5C25631624D27368BE1F89F39F380CF9FF2C449"
+        },
+        {
+          "name": "TASystemSettings.ini",
+          "sha256": "C9A5EFA21311A96A550735A0F4602713F8F3661AEEE1889BB2AD9182DEFD97E4"
+        },
+        {
+          "name": "README.md",
+          "sha256": "B11FF77C35408DF2B636FBBEFDD75E73988249B94168AF9349D0CD27E8D2392B"
         }
       ]
     }
