@@ -85,6 +85,61 @@ function Remove-Override($slug) {
 
 function Get-Sha256($path) { (Get-FileHash -Path $path -Algorithm SHA256).Hash }
 
+# ---------- validation ----------
+# Security boundary for content arriving over the update channel (catalog,
+# manifests, templates). CI validates the same rules, but runtime must not
+# trust the repo: enforce before any Join-Path / file write.
+
+function Test-SafeSlug($slug) {
+  return [bool]($slug -cmatch '^[a-z0-9-]+$')
+}
+
+function Test-SafeFileName($name) {
+  # Leaf filenames only: no separators, no leading dot, no traversal,
+  # no Win32 trailing dot/space stripping, no reserved device names.
+  if (-not $name) { return $false }
+  if ($name -notmatch '^[A-Za-z0-9][A-Za-z0-9 ._-]*$') { return $false }
+  if ($name -match '[. ]$') { return $false }
+  if ($name -match '^(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$') { return $false }
+  return $true
+}
+
+function Test-SafeDest($dest) {
+  # Manifest dest/detect paths must be rooted at an allowlisted token and
+  # contain only clean relative segments — absolute paths, drive letters,
+  # and .. traversal are all impossible by construction.
+  if (-not $dest) { return $false }
+  if ($dest -cnotmatch '^\{(localappdata|appdata|documents|steamuserdata|custom)\}/') { return $false }
+  $rest = $dest -replace '^\{[a-z]+\}/', ''
+  foreach ($seg in ($rest -split '[/\\]')) {
+    if ($seg -notmatch '^[A-Za-z0-9][A-Za-z0-9 ._()-]*$') { return $false }
+    if ($seg -match '[. ]$') { return $false }
+  }
+  return $true
+}
+
+function Resolve-DestPath($dest, $custom = $null) {
+  # Validate + expand a manifest dest, then re-check that the normalized
+  # result is still inside the root the leading token expands to (defends
+  # against normalization tricks and hostile {custom} contents).
+  if (-not (Test-SafeDest $dest)) { throw "Unsafe destination path in manifest: $dest" }
+  $token = [regex]::Match($dest, '^\{([a-z]+)\}').Groups[1].Value
+  $root = switch ($token) {
+    'localappdata'  { $env:LOCALAPPDATA }
+    'appdata'       { $env:APPDATA }
+    'documents'     { [Environment]::GetFolderPath('MyDocuments') }
+    'steamuserdata' { Get-SteamUserData }
+    'custom'        { if (-not $custom) { throw 'Set the game folder first' }; $custom }
+  }
+  $full = [IO.Path]::GetFullPath((Expand-PathTokens $dest $custom))
+  $fullRoot = [IO.Path]::GetFullPath($root).TrimEnd('\', '/')
+  if (-not ($full.StartsWith("$fullRoot\", 'OrdinalIgnoreCase') -or
+            $full.StartsWith("$fullRoot/", 'OrdinalIgnoreCase'))) {
+    throw "Destination escapes its root: $dest"
+  }
+  return $full
+}
+
 function Test-VersionNewer($remote, $local) {
   # True when $remote is a strictly newer version than $local.
   # Missing local = never seen = newer; unparseable input = not newer (fail safe).
@@ -272,7 +327,8 @@ function Invoke-Apply($slug) {
   $targets = @()
 
   foreach ($t in $m.targets) {
-    $dest = Expand-PathTokens $t.dest $override
+    if (-not (Test-SafeFileName $t.template)) { throw "Unsafe template name in manifest: $($t.template)" }
+    $dest = Resolve-DestPath $t.dest $override
     $content = Get-Content (Join-Path $gameDir $t.template) -Raw
     foreach ($k in $vars.Keys) { $content = $content.Replace("{{$k}}", [string]$vars[$k]) }
 
@@ -355,11 +411,13 @@ function Invoke-Update {
 
   $updated = @()
   foreach ($g in $remote.games) {
+    if (-not (Test-SafeSlug $g.slug)) { throw "Unsafe game slug in catalog: $($g.slug)" }
     $lv = $localVersions[$g.slug]
     if (-not (Test-VersionNewer $g.version $lv) -and (Test-Path (Join-Path $CacheDir $g.slug))) { continue }
     $dir = Join-Path $CacheDir $g.slug
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     foreach ($f in $g.files) {
+      if (-not (Test-SafeFileName $f)) { throw "Unsafe file name in catalog: $f" }
       Invoke-WebRequest "$RawBase/games/$($g.slug)/$f" -Headers $headers -OutFile (Join-Path $dir $f)
     }
     $updated += $g.slug

@@ -64,6 +64,74 @@ Describe 'Expand-PathTokens' {
   }
 }
 
+Describe 'Test-SafeSlug' {
+  It 'accepts <_>' -ForEach 'cs2', 'rocket-league', 'apex-legends-2' {
+    Test-SafeSlug $_ | Should -BeTrue
+  }
+  It 'rejects <_>' -ForEach '../cs2', 'CS2', 'cs2/..', 'a b', '', 'cs2\evil' {
+    Test-SafeSlug $_ | Should -BeFalse
+  }
+}
+
+Describe 'Test-SafeFileName' {
+  It 'accepts <_>' -ForEach 'autoexec.cfg', 'GameUserSettings.ini', 'manifest.json', 'My Config v2.txt', 'a-b_c.d' {
+    Test-SafeFileName $_ | Should -BeTrue
+  }
+  It 'rejects <_>' -ForEach `
+    '../evil.cfg', '..\evil.cfg', 'sub/file.cfg', 'sub\file.cfg', '.hidden',
+    'trailing.', 'trailing ', 'CON', 'con.cfg', 'NUL.txt', 'COM1', '', 'C:file' {
+    Test-SafeFileName $_ | Should -BeFalse
+  }
+}
+
+Describe 'Test-SafeDest' {
+  It 'accepts <_>' -ForEach `
+    '{localappdata}/FortniteGame/Saved/Config/WindowsClient/GameUserSettings.ini',
+    '{steamuserdata}/730/local/cfg/autoexec.cfg',
+    '{documents}/My Games/Rocket League/TAGame/Config/TASystemSettings.ini',
+    '{custom}/cfg/autoexec.cfg' {
+    Test-SafeDest $_ | Should -BeTrue
+  }
+  It 'rejects <_>' -ForEach `
+    'C:/Windows/System32/evil.dll',
+    '/etc/passwd',
+    '{localappdata}/../../Windows/evil.dll',
+    '{appdata}/Microsoft/Windows/Start Menu/Programs/Startup/..\..\evil.bat',
+    '{unknown}/foo.cfg',
+    '{localappdata}',
+    '{localappdata}/.hidden/x.cfg',
+    '{documents}/foo./bar.cfg',
+    '' {
+    Test-SafeDest $_ | Should -BeFalse
+  }
+  It 'rejects the Startup-folder traversal shape specifically' {
+    # the attack from the threat model: manifest dest aimed at the Startup folder via ..
+    Test-SafeDest '{localappdata}/../Roaming/Microsoft/Windows/Start Menu/Programs/Startup/evil.bat' |
+      Should -BeFalse
+  }
+}
+
+Describe 'Resolve-DestPath' {
+  BeforeEach {
+    $env:LOCALAPPDATA = Join-Path $TestDrive 'LocalAppData'
+    New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA | Out-Null
+  }
+
+  It 'expands a clean dest under its root' {
+    $result = Resolve-DestPath '{localappdata}/Game/config.ini'
+    $result | Should -Match 'config\.ini$'
+  }
+  It 'throws on an unsafe dest before expansion' {
+    { Resolve-DestPath '{localappdata}/../evil.cfg' } | Should -Throw '*Unsafe destination*'
+  }
+  It 'throws on an absolute dest' {
+    { Resolve-DestPath 'C:/Windows/evil.cfg' } | Should -Throw '*Unsafe destination*'
+  }
+  It 'throws when {custom} has no override' {
+    { Resolve-DestPath '{custom}/cfg/autoexec.cfg' } | Should -Throw '*game folder*'
+  }
+}
+
 Describe 'Get-GameStatus' {
   BeforeAll {
     $script:liveFile = Join-Path $TestDrive 'live.cfg'
