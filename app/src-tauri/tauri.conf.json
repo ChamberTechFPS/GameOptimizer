@@ -23,6 +23,11 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine"
+      }
+    },
     "resources": {
       "../../engine/": "engine/",
       "../../games/": "games/",
