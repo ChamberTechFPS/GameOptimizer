@@ -197,5 +197,9 @@ $("update-btn").onclick = async () => {
   btn.textContent = "Update configs";
 };
 
+for (const el of document.querySelectorAll(".watermark [data-url]")) {
+  el.onclick = () => invoke("open_url", { url: el.dataset.url });
+}
+
 loadVersion();
 scan().then(checkUpdates);
