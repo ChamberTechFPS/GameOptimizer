@@ -166,6 +166,72 @@ Describe 'Get-GameStatus' {
   }
 }
 
+Describe 'Test-CatalogSignature' {
+  BeforeAll {
+    # Ephemeral keypair so tests don't need the maintainer's private key
+    $script:rsa = [System.Security.Cryptography.RSA]::Create(3072)
+    $p = $script:rsa.ExportParameters($false)
+    $script:testMod = [Convert]::ToBase64String($p.Modulus)
+    $script:testExp = [Convert]::ToBase64String($p.Exponent)
+    $script:payload = [Text.Encoding]::UTF8.GetBytes('{"catalogVersion":"1.0.0","games":[]}')
+    $script:goodSig = $script:rsa.SignData($script:payload,
+      [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+      [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+  }
+  AfterAll { $script:rsa.Dispose() }
+
+  It 'accepts a valid signature' {
+    Test-CatalogSignature $script:payload $script:goodSig $script:testMod $script:testExp |
+      Should -BeTrue
+  }
+  It 'rejects tampered content' {
+    $tampered = [byte[]]$script:payload.Clone()
+    $tampered[10] = $tampered[10] -bxor 1
+    Test-CatalogSignature $tampered $script:goodSig $script:testMod $script:testExp |
+      Should -BeFalse
+  }
+  It 'rejects a tampered signature' {
+    $badSig = [byte[]]$script:goodSig.Clone()
+    $badSig[0] = $badSig[0] -bxor 1
+    Test-CatalogSignature $script:payload $badSig $script:testMod $script:testExp |
+      Should -BeFalse
+  }
+  It 'rejects a signature from a different key' {
+    $other = [System.Security.Cryptography.RSA]::Create(3072)
+    try {
+      $otherSig = $other.SignData($script:payload,
+        [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+        [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+      Test-CatalogSignature $script:payload $otherSig $script:testMod $script:testExp |
+        Should -BeFalse
+    } finally { $other.Dispose() }
+  }
+  It 'verifies the committed catalog.json against the embedded public key' {
+    $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $bytes = [IO.File]::ReadAllBytes((Join-Path $repoRoot 'catalog.json'))
+    $sig   = [IO.File]::ReadAllBytes((Join-Path $repoRoot 'catalog.json.sig'))
+    Test-CatalogSignature $bytes $sig | Should -BeTrue
+  }
+}
+
+Describe 'Assert-NoCatalogRollback' {
+  BeforeEach { Remove-Item $HighWaterFile -ErrorAction SilentlyContinue }
+  AfterAll   { Remove-Item $HighWaterFile -ErrorAction SilentlyContinue }
+
+  It 'allows any version when nothing was seen yet' {
+    { Assert-NoCatalogRollback '1.0.0' } | Should -Not -Throw
+  }
+  It 'allows equal and newer versions' {
+    Set-Content $HighWaterFile -Value '2.0.0'
+    { Assert-NoCatalogRollback '2.0.0' } | Should -Not -Throw
+    { Assert-NoCatalogRollback '2.1.0' } | Should -Not -Throw
+  }
+  It 'rejects an older catalog than previously seen' {
+    Set-Content $HighWaterFile -Value '2.0.0'
+    { Assert-NoCatalogRollback '1.9.0' } | Should -Throw '*rollback*'
+  }
+}
+
 Describe 'Overrides round-trip' {
   It 'set, get, and remove an override' {
     $folder = Join-Path $TestDrive 'gamedir'

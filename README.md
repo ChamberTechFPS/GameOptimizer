@@ -34,8 +34,18 @@ Path tokens in `dest`/`detect.paths` resolve at apply time: `{steamuserdata}` (m
 
 On launch the app checks GitHub:
 
-- **Config updates** (new games, tweaked settings) → banner appears → one click downloads them to a local cache. Bumping a game's `version` in `catalog.json` is all it takes to push an update to every user.
+- **Config updates** (new games, tweaked settings) → banner appears → one click downloads them to a local cache. Bumping a game's `version` in `catalog.json` (and re-signing) is all it takes to push an update to every user.
 - **App updates** → popup links to the latest [release](../../releases).
+
+### Update security
+
+Config updates are **signed and pinned** — a compromised repo or GitHub account can't push configs to users:
+
+1. `catalog.json` carries a SHA-256 for every config file; the catalog itself is signed offline with the maintainer's RSA-3072 key (`catalog.json.sig`). The public key is embedded in `engine/lib.ps1`.
+2. The engine downloads the catalog + signature from immutable **release assets** (never a branch), verifies the signature, rejects version rollbacks, then fetches config files from the release's tag and verifies each file's hash before atomically swapping it into the cache. Templates are re-hashed against the signed catalog again at apply time.
+3. File names, slugs, and destination paths from the update channel are validated at runtime — dests must stay under an allowlisted root (`{localappdata}`, `{documents}`, …); traversal and absolute paths are rejected.
+
+Maintainer flow after changing any config: `pwsh tools/Update-CatalogHashes.ps1` → `pwsh tools/Sign-Catalog.ps1` (requires the private key, which never enters the repo or CI) → commit → tag a release. CI fails if hashes are stale or the signature doesn't match.
 
 ## CLI usage (no app needed)
 
@@ -61,8 +71,8 @@ cargo tauri build    # produce the NSIS installer
 ## Adding a game
 
 1. Create `games/<slug>/` with `manifest.json` (see `schema/manifest.schema.json`), the config template, and a README with benchmark receipts.
-2. Add the game to `catalog.json` with `"version": "1.0.0"`.
-3. PR it — CI validates the manifest automatically.
+2. Add the game to `catalog.json` with `"version": "1.0.0"` and run `pwsh tools/Update-CatalogHashes.ps1` to fill in the file hashes.
+3. PR it — CI validates the manifest, catalog, and hash freshness automatically. The maintainer re-signs the catalog when merging.
 
 ## Disclaimer
 

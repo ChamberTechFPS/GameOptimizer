@@ -6,7 +6,6 @@
 #>
 
 $Repo       = 'ChamberTechFPS/GameOptimizer'   # <- update if repo name differs
-$RawBase    = "https://raw.githubusercontent.com/$Repo/main"
 $AppVersion = '0.1.0'
 
 $RepoRoot  = Split-Path $PSScriptRoot -Parent
@@ -17,6 +16,13 @@ $CacheDir  = Join-Path $DataDir 'games'
 $BackupDir = Join-Path $DataDir 'backups'
 $StateFile = Join-Path $DataDir 'state.json'
 $OverrideFile = Join-Path $DataDir 'overrides.json'
+$HighWaterFile = Join-Path $DataDir 'catalog-version'
+
+# RSA-3072 public key for catalog signature verification. The private key
+# lives offline with the maintainer; catalog.json.sig is produced with
+# tools/Sign-Catalog.ps1 before each release. Exponent is 65537.
+$CatalogPubKeyModulus = 'zbihHrYvUYL9xXB/zYc8eDAr7slFXWCVunfJFF6qiSgd/SZwk0uHPZqSCg8ZmcDAdRD/DRr2dQzZJhM6FeV3hoSixL3dCn7+vjhqZLHpKfy+imBPI4UQ9znTS5IWFZqnwonjylWVa91VLq55yaOCZB0SoCHIilWGf8rlhZPm3i75mB35DdE6qF5nkUWmN1E3U5B2VAB/gCd/xNKVoP7HM31PeuRk/Gr+ea9TqFObijZY3CeCX4txvoJJGnOjo4sOtQbzPqqCyhYPVSJiuvCTz2VKqVpILVyClLMsXNCX0vtaNvoaSOxgcEu82/pug7n3cZrMYgtO3dN6iTnEfMUzjR5sMRqnNwJKnDQm1hUTCxpxD0CteFLN4J73FJOIDqtavfS+kdmRpu1McCmEBaHra66olEIceQHYlV7LSksjO1LwShib388ABLJJV9hdG4BMcc6/oiEMNtgkhK1qoU6BEZAtnF/NuNmwOvT6xyZF9sRUGuaYeULBLQ+hHteT121F'
+$CatalogPubKeyExponent = 'AQAB'
 
 function Initialize-DataDir {
   New-Item -ItemType Directory -Force -Path $DataDir, $BackupDir | Out-Null
@@ -325,11 +331,19 @@ function Invoke-Apply($slug) {
   $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
   $gameBackupDir = Join-Path $BackupDir "$slug\$stamp"
   $targets = @()
+  $catEntry = (Get-LocalCatalog).games | Where-Object { $_.slug -eq $slug } | Select-Object -First 1
 
   foreach ($t in $m.targets) {
     if (-not (Test-SafeFileName $t.template)) { throw "Unsafe template name in manifest: $($t.template)" }
     $dest = Resolve-DestPath $t.dest $override
-    $content = Get-Content (Join-Path $gameDir $t.template) -Raw
+    $tplPath = Join-Path $gameDir $t.template
+    # Re-check the cached template against the signed catalog at apply time,
+    # so a tampered local cache can't slip content past the download check.
+    $fileEntry = @($catEntry.files) | Where-Object { $_.name -eq $t.template } | Select-Object -First 1
+    if ($fileEntry.sha256 -and ((Get-Sha256 $tplPath) -ne $fileEntry.sha256.ToUpper())) {
+      throw "Cached config for $slug failed its integrity check — run update to re-download"
+    }
+    $content = Get-Content $tplPath -Raw
     foreach ($k in $vars.Keys) { $content = $content.Replace("{{$k}}", [string]$vars[$k]) }
 
     $backup = $null
@@ -373,11 +387,73 @@ function Invoke-Revert($slug) {
 
 # ---------- updates ----------
 
+function Test-CatalogSignature($bytes, $sigBytes, $modulus = $CatalogPubKeyModulus, $exponent = $CatalogPubKeyExponent) {
+  # RSA-3072 + SHA-256, PKCS#1 v1.5 (what `openssl dgst -sha256 -sign` produces).
+  # RSA base-class API works on .NET Framework 4.6+ (PS 5.1) and .NET (pwsh).
+  $rsa = [System.Security.Cryptography.RSA]::Create()
+  try {
+    $params = New-Object System.Security.Cryptography.RSAParameters
+    $params.Modulus  = [Convert]::FromBase64String($modulus)
+    $params.Exponent = [Convert]::FromBase64String($exponent)
+    $rsa.ImportParameters($params)
+    return $rsa.VerifyData($bytes, $sigBytes,
+      [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+      [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+  } finally { $rsa.Dispose() }
+}
+
+function Get-CatalogHighWater {
+  if (Test-Path $HighWaterFile) { return (Get-Content $HighWaterFile -Raw).Trim() }
+  return $null
+}
+
+function Assert-NoCatalogRollback($remoteVersion) {
+  $hw = Get-CatalogHighWater
+  if ($hw -and (Test-VersionNewer $hw $remoteVersion)) {
+    throw "Rejected catalog rollback: remote $remoteVersion is older than previously seen $hw"
+  }
+}
+
+function Get-LatestRelease {
+  $headers = @{ 'User-Agent' = 'ChamberGameOptimizer' }
+  return Invoke-RestMethod "https://api.github.com/repos/$Repo/releases/latest" -Headers $headers
+}
+
+function Get-ReleaseAssetUrl($release, $name) {
+  $a = @($release.assets) | Where-Object { $_.name -eq $name } | Select-Object -First 1
+  if (-not $a) { throw "Release $($release.tag_name) is missing asset: $name" }
+  return $a.browser_download_url
+}
+
+function Get-VerifiedRemoteCatalog($release) {
+  # Catalog + signature come from immutable release assets, never a branch.
+  # One signature over catalog.json transitively authenticates every config
+  # file via the per-file sha256 entries.
+  $headers = @{ 'User-Agent' = 'ChamberGameOptimizer' }
+  $tmp = Join-Path ([IO.Path]::GetTempPath()) "chamber-catalog-$PID"
+  New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+  try {
+    $catPath = Join-Path $tmp 'catalog.json'
+    $sigPath = Join-Path $tmp 'catalog.json.sig'
+    Invoke-WebRequest (Get-ReleaseAssetUrl $release 'catalog.json') -Headers $headers -OutFile $catPath
+    Invoke-WebRequest (Get-ReleaseAssetUrl $release 'catalog.json.sig') -Headers $headers -OutFile $sigPath
+    $bytes = [IO.File]::ReadAllBytes($catPath)
+    $sig   = [IO.File]::ReadAllBytes($sigPath)
+    if (-not (Test-CatalogSignature $bytes $sig)) {
+      throw 'Catalog signature verification FAILED — refusing update'
+    }
+    $catalog = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
+    Assert-NoCatalogRollback $catalog.catalogVersion
+    return [pscustomobject]@{ catalog = $catalog; bytes = $bytes }
+  } finally {
+    Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
 function Invoke-CheckUpdate {
   try {
-    $headers = @{ 'User-Agent' = 'ChamberGameOptimizer' }
-    $release = Invoke-RestMethod "https://api.github.com/repos/$Repo/releases/latest" -Headers $headers
-    $remote  = Invoke-RestMethod "$RawBase/catalog.json" -Headers $headers
+    $release = Get-LatestRelease
+    $remote  = (Get-VerifiedRemoteCatalog $release).catalog
     $local   = Get-LocalCatalog
 
     $appLatest = ($release.tag_name -replace '^v', '')
@@ -404,8 +480,13 @@ function Invoke-CheckUpdate {
 
 function Invoke-Update {
   $headers = @{ 'User-Agent' = 'ChamberGameOptimizer' }
-  $remote = Invoke-RestMethod "$RawBase/catalog.json" -Headers $headers
-  $local  = Get-LocalCatalog
+  $release  = Get-LatestRelease
+  $verified = Get-VerifiedRemoteCatalog $release
+  $remote   = $verified.catalog
+  # Config files are fetched from the immutable tag ref the release points at.
+  $tagBase  = "https://raw.githubusercontent.com/$Repo/$($release.tag_name)"
+
+  $local = Get-LocalCatalog
   $localVersions = @{}
   foreach ($g in $local.games) { $localVersions[$g.slug] = $g.version }
 
@@ -414,14 +495,28 @@ function Invoke-Update {
     if (-not (Test-SafeSlug $g.slug)) { throw "Unsafe game slug in catalog: $($g.slug)" }
     $lv = $localVersions[$g.slug]
     if (-not (Test-VersionNewer $g.version $lv) -and (Test-Path (Join-Path $CacheDir $g.slug))) { continue }
-    $dir = Join-Path $CacheDir $g.slug
-    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+
+    # Download to a staging dir; only swap into the cache once every file's
+    # hash matches the signed catalog. A failed game never half-updates.
+    $staging = Join-Path $DataDir "staging\$($g.slug)"
+    if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $staging | Out-Null
     foreach ($f in $g.files) {
-      if (-not (Test-SafeFileName $f)) { throw "Unsafe file name in catalog: $f" }
-      Invoke-WebRequest "$RawBase/games/$($g.slug)/$f" -Headers $headers -OutFile (Join-Path $dir $f)
+      if (-not (Test-SafeFileName $f.name)) { throw "Unsafe file name in catalog: $($f.name)" }
+      $filePath = Join-Path $staging $f.name
+      Invoke-WebRequest "$tagBase/games/$($g.slug)/$($f.name)" -Headers $headers -OutFile $filePath
+      if ((Get-Sha256 $filePath) -ne $f.sha256.ToUpper()) {
+        throw "Integrity check FAILED for $($g.slug)/$($f.name) — refusing update"
+      }
     }
+    $dir = Join-Path $CacheDir $g.slug
+    New-Item -ItemType Directory -Force -Path $CacheDir | Out-Null
+    if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
+    Move-Item $staging $dir
     $updated += $g.slug
   }
+  Remove-Item (Join-Path $DataDir 'staging') -Recurse -Force -ErrorAction SilentlyContinue
+
   # Seed cache with any bundled games the remote catalog doesn't cover yet
   foreach ($g in $local.games) {
     $dir = Join-Path $CacheDir $g.slug
@@ -429,6 +524,10 @@ function Invoke-Update {
       Copy-Item (Join-Path $RepoRoot "games\$($g.slug)") $dir -Recurse -Force -ErrorAction SilentlyContinue
     }
   }
-  Out-Json $remote | Set-Content (Join-Path $DataDir 'catalog.json') -Encoding UTF8
+  # Persist the byte-exact verified catalog and advance the rollback high-water mark
+  [IO.File]::WriteAllBytes((Join-Path $DataDir 'catalog.json'), $verified.bytes)
+  if (Test-VersionNewer $remote.catalogVersion (Get-CatalogHighWater)) {
+    Set-Content $HighWaterFile -Value $remote.catalogVersion -Encoding UTF8
+  }
   Out-Json ([pscustomobject]@{ ok = $true; updated = $updated; catalogVersion = $remote.catalogVersion })
 }

@@ -15,17 +15,45 @@ jobs:
             echo "Validating $m"
             ajv validate -s schema/manifest.schema.json -d "$m" --strict=false
           done
-      - name: Validate catalog.json
+      - name: Validate catalog against schema
+        run: ajv validate -s schema/catalog.schema.json -d catalog.json --strict=false
+      - name: Check catalog hashes are fresh
         run: |
           python3 - <<'EOF'
-          import json, os
+          import hashlib, json, os, sys
+
           cat = json.load(open('catalog.json'))
-          assert 'catalogVersion' in cat
+          errors = []
           for g in cat['games']:
               d = os.path.join('games', g['slug'])
-              assert os.path.isdir(d), f"missing folder {d}"
+              if not os.path.isdir(d):
+                  errors.append(f"missing folder {d}")
+                  continue
               for f in g['files']:
-                  p = os.path.join(d, f)
-                  assert os.path.isfile(p), f"catalog lists missing file {p}"
+                  p = os.path.join(d, f['name'])
+                  if not os.path.isfile(p):
+                      errors.append(f"catalog lists missing file {p}")
+                      continue
+                  actual = hashlib.sha256(open(p, 'rb').read()).hexdigest().upper()
+                  if actual != f['sha256']:
+                      errors.append(f"stale hash for {p} — run tools/Update-CatalogHashes.ps1 and re-sign")
+              # every game dir file should be listed so updates ship everything
+              listed = {f['name'] for f in g['files']}
+              on_disk = {n for n in os.listdir(d) if os.path.isfile(os.path.join(d, n))}
+              for missing in on_disk - listed:
+                  errors.append(f"{d}/{missing} exists but is not in catalog files[]")
+          if errors:
+              print('\n'.join(errors)); sys.exit(1)
           print('catalog OK')
           EOF
+      - name: Check catalog signature matches
+        shell: pwsh
+        run: |
+          $env:CHAMBER_DATA_DIR = [IO.Path]::GetTempPath()
+          . ./engine/lib.ps1
+          $bytes = [IO.File]::ReadAllBytes('catalog.json')
+          $sig   = [IO.File]::ReadAllBytes('catalog.json.sig')
+          if (-not (Test-CatalogSignature $bytes $sig)) {
+            throw 'catalog.json.sig does not match catalog.json — re-run tools/Sign-Catalog.ps1'
+          }
+          Write-Host 'signature OK'
