@@ -2,11 +2,19 @@ const { invoke } = window.__TAURI__.core;
 const { open } = window.__TAURI__.dialog;
 
 const $ = (id) => document.getElementById(id);
-const REPO_URL = "https://github.com/ChamberTechFPS/GameOptimizer";
+let REPO_URL = "https://github.com/ChamberTechFPS/GameOptimizer"; // fallback; the engine owns the real value
 
 async function engine(action, game, path) {
   const raw = await invoke("engine", { action, game: game ?? null, path: path ?? null });
   return JSON.parse(raw);
+}
+
+// One engine action at a time — concurrent applies would race on state.json
+let busy = false;
+
+// PowerShell errors arrive with stack noise; keep the first line only
+function errText(e) {
+  return String(e).split("\n")[0].slice(0, 200);
 }
 
 let toastTimer;
@@ -39,14 +47,24 @@ function meta(g) {
   return `${platform} · not yet optimized`;
 }
 
+// Revert is two-step: first click arms it, second click within 3s confirms
+let pendingRevert = null;
+let pendingRevertTimer;
+
+function revertAction(g) {
+  return pendingRevert === g.slug
+    ? { label: "Confirm revert?", act: "revert", danger: true }
+    : { label: "Revert", act: "confirm-revert" };
+}
+
 function actionsFor(g) {
   const location = g.customPath
     ? [{ label: "Change folder", act: "set-path" }, { label: "Clear", act: "clear-path", ghost: true }]
     : [{ label: "Set location", act: "set-path" }];
 
   switch (g.status) {
-    case "applied": return [{ label: "Revert", act: "revert" }];
-    case "drifted": return [{ label: "Re-apply", act: "apply" }, { label: "Revert", act: "revert" }];
+    case "applied": return [revertAction(g)];
+    case "drifted": return [{ label: "Re-apply", act: "apply" }, revertAction(g)];
     case "not-applied": return g.customPath || g.needsPath
       ? [{ label: "Apply", act: "apply" }, ...location]
       : [{ label: "Apply", act: "apply" }];
@@ -56,10 +74,20 @@ function actionsFor(g) {
   }
 }
 
+let lastGames = [];
+
 function render(games) {
+  lastGames = games;
   const list = $("game-list");
   list.innerHTML = "";
   let detected = 0, optimized = 0, drifted = 0;
+
+  if (games.length === 0) {
+    const p = document.createElement("p");
+    p.className = "loading";
+    p.textContent = "No game configs found — try Update configs, or reinstall the app.";
+    list.append(p);
+  }
 
   for (const g of games) {
     if (g.installed) detected++;
@@ -96,7 +124,7 @@ function render(games) {
 
     for (const a of actionsFor(g)) {
       const btn = document.createElement("button");
-      btn.className = a.ghost ? "btn btn-ghost" : "btn";
+      btn.className = a.ghost ? "btn btn-ghost" : a.danger ? "btn btn-danger" : "btn";
       btn.textContent = a.label;
       btn.onclick = () => handleAction(a.act, g, btn);
       row.append(btn);
@@ -114,33 +142,54 @@ async function handleAction(act, g, btn) {
     await invoke("open_url", { url: `${REPO_URL}/blob/main/games/${g.slug}/guide.md` });
     return;
   }
-  if (act === "set-path") {
-    const picked = await open({
-      directory: true,
-      multiple: false,
-      title: g.customLabel || `Select the folder for ${g.name}`,
-    });
-    if (!picked) return; // user cancelled
-    try {
-      await engine("set-path", g.slug, picked);
-      toast(`Set ${g.name} folder`, "ok");
-    } catch (e) {
-      toast(`Couldn't set folder for ${g.name}: ${e}`, "error");
-    }
-    await scan();
+  if (act === "confirm-revert") {
+    pendingRevert = g.slug;
+    clearTimeout(pendingRevertTimer);
+    pendingRevertTimer = setTimeout(() => {
+      if (pendingRevert === g.slug) {
+        pendingRevert = null;
+        render(lastGames);
+      }
+    }, 3000);
+    render(lastGames);
     return;
   }
-
-  const VERB = { apply: "Applied", revert: "Reverted", "clear-path": "Cleared folder for" };
-  btn.disabled = true;
-  btn.textContent = "…";
+  if (busy) return;
+  busy = true;
+  document.body.classList.add("busy");
   try {
-    await engine(act, g.slug);
-    toast(`${VERB[act] ?? act} ${g.name}`, "ok");
-  } catch (e) {
-    toast(`${act} failed for ${g.name}: ${e}`, "error");
+    if (act === "set-path") {
+      const picked = await open({
+        directory: true,
+        multiple: false,
+        title: g.customLabel || `Select the folder for ${g.name}`,
+      });
+      if (!picked) return; // user cancelled
+      try {
+        await engine("set-path", g.slug, picked);
+        toast(`Set ${g.name} folder`, "ok");
+      } catch (e) {
+        toast(`Couldn't set folder for ${g.name}: ${errText(e)}`, "error");
+      }
+      await scan();
+      return;
+    }
+
+    if (act === "revert") pendingRevert = null;
+    const VERB = { apply: "Applied", revert: "Reverted", "clear-path": "Cleared folder for" };
+    btn.disabled = true;
+    btn.textContent = "…";
+    try {
+      await engine(act, g.slug);
+      toast(`${VERB[act] ?? act} ${g.name}`, "ok");
+    } catch (e) {
+      toast(`${act} failed for ${g.name}: ${errText(e)}`, "error");
+    }
+    await scan();
+  } finally {
+    busy = false;
+    document.body.classList.remove("busy");
   }
-  await scan();
 }
 
 async function scan() {
@@ -149,16 +198,17 @@ async function scan() {
   } catch (e) {
     const p = document.createElement("p");
     p.className = "loading";
-    p.textContent = `Scan failed: ${e}`;
+    p.textContent = `Scan failed: ${errText(e)}`;
     $("game-list").replaceChildren(p);
   }
 }
 
 async function loadVersion() {
   try {
-    const { appVersion } = await engine("version");
+    const { appVersion, repoUrl } = await engine("version");
     if (appVersion) $("app-version").textContent = appVersion;
-  } catch { /* leave the fallback shown in the HTML */ }
+    if (repoUrl) REPO_URL = repoUrl;
+  } catch { /* leave the fallbacks from the HTML/JS */ }
 }
 
 async function checkUpdates() {
@@ -188,10 +238,23 @@ async function checkUpdates() {
   }
 }
 
+function closeModal() {
+  $("modal").classList.add("hidden");
+}
+
 $("rescan-btn").onclick = scan;
 $("update-dismiss").onclick = () => $("update-banner").classList.add("hidden");
-$("modal-close").onclick = () => $("modal").classList.add("hidden");
+$("modal-close").onclick = closeModal;
+$("modal").onclick = (e) => {
+  if (e.target === e.currentTarget) closeModal();
+};
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeModal();
+});
 $("update-btn").onclick = async () => {
+  if (busy) return;
+  busy = true;
+  document.body.classList.add("busy");
   const btn = $("update-btn");
   btn.disabled = true;
   btn.textContent = "Updating…";
@@ -201,10 +264,13 @@ $("update-btn").onclick = async () => {
     toast("Configs updated", "ok");
     await scan();
   } catch (e) {
-    toast(`Update failed: ${e}`, "error");
+    toast(`Update failed: ${errText(e)}`, "error");
+  } finally {
+    busy = false;
+    document.body.classList.remove("busy");
+    btn.disabled = false;
+    btn.textContent = "Update configs";
   }
-  btn.disabled = false;
-  btn.textContent = "Update configs";
 };
 
 for (const el of document.querySelectorAll(".watermark [data-url]")) {

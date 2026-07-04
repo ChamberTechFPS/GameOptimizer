@@ -44,5 +44,5 @@ switch ($Action) {
     Remove-Override $Game
     Out-Json ([pscustomobject]@{ ok = $true; slug = $Game })
   }
-  'version'      { Out-Json ([pscustomobject]@{ appVersion = $AppVersion }) }
+  'version'      { Out-Json ([pscustomobject]@{ appVersion = $AppVersion; repoUrl = "https://github.com/$Repo" }) }
 }
