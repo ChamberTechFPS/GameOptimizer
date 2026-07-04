@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
   Chamber Game Optimizer — engine
   Single source of truth for the CLI and the GUI (the Tauri app shells out to this).

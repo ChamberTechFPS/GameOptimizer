@@ -1,4 +1,4 @@
-#Requires -Version 7
+﻿#Requires -Version 7
 <#
   Recompute the sha256 for every file listed in catalog.json from the
   games/ tree and rewrite the catalog in place. Run after any config or

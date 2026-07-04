@@ -165,8 +165,15 @@ async function checkUpdates() {
   let info;
   try {
     info = await engine("check-update");
-  } catch { return; }
-  if (!info || info.error) return;
+  } catch {
+    $("net-status").classList.remove("hidden");
+    return;
+  }
+  if (!info || info.error) {
+    if (info?.error) $("net-status").classList.remove("hidden");
+    return;
+  }
+  $("net-status").classList.add("hidden");
 
   if (info.configUpdates && info.configUpdates.length > 0) {
     $("update-banner-text").textContent =

@@ -160,6 +160,7 @@ body {
 }
 .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
 .dot.ok { background: var(--accent); }
+.net-status { color: var(--warn); }
 
 .modal-overlay {
   position: fixed; inset: 0;

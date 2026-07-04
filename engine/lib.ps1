@@ -1,4 +1,4 @@
-<#
+﻿<#
   Chamber Game Optimizer — engine library
   All functions and shared state live here; cli.ps1 dot-sources this file
   and dispatches. Tests dot-source it directly (with $env:CHAMBER_DATA_DIR
@@ -194,7 +194,7 @@ function Test-EpicGame($appName) {
     try {
       $j = Get-Content $f.FullName -Raw | ConvertFrom-Json
       if ($j.DisplayName -eq $appName -or $j.AppName -eq $appName) { return $true }
-    } catch { }
+    } catch { Write-Verbose "Skipping unreadable Epic manifest $($f.Name): $_" }
   }
   return $false
 }
@@ -346,18 +346,23 @@ function Invoke-Apply($slug) {
     $content = Get-Content $tplPath -Raw
     foreach ($k in $vars.Keys) { $content = $content.Replace("{{$k}}", [string]$vars[$k]) }
 
-    $backup = $null
+    $backup = $null; $backupHash = $null
     if (Test-Path $dest) {
       New-Item -ItemType Directory -Force -Path $gameBackupDir | Out-Null
       $backup = Join-Path $gameBackupDir (Split-Path $dest -Leaf)
       Copy-Item $dest $backup -Force
+      $backupHash = Get-Sha256 $backup
       Set-ItemProperty $dest -Name IsReadOnly -Value $false -ErrorAction SilentlyContinue
     }
     New-Item -ItemType Directory -Force -Path (Split-Path $dest -Parent) | Out-Null
-    Set-Content -Path $dest -Value $content -Encoding UTF8 -NoNewline
+    try {
+      Set-Content -Path $dest -Value $content -Encoding UTF8 -NoNewline
+    } catch [System.IO.IOException] {
+      throw "Can't write $(Split-Path $dest -Leaf) — if $($m.name) is running, close it and retry"
+    }
     if ($t.readOnlyAfterApply) { Set-ItemProperty $dest -Name IsReadOnly -Value $true }
 
-    $targets += [pscustomobject]@{ dest = $dest; hash = (Get-Sha256 $dest); backup = $backup }
+    $targets += [pscustomobject]@{ dest = $dest; hash = (Get-Sha256 $dest); backup = $backup; backupHash = $backupHash }
   }
 
   $state = Get-State
@@ -375,7 +380,15 @@ function Invoke-Revert($slug) {
       Set-ItemProperty $t.dest -Name IsReadOnly -Value $false -ErrorAction SilentlyContinue
     }
     if ($t.backup -and (Test-Path $t.backup)) {
-      Copy-Item $t.backup $t.dest -Force
+      # Don't restore a backup that no longer matches what we saved
+      if ($t.backupHash -and ((Get-Sha256 $t.backup) -ne $t.backupHash)) {
+        throw "Backup for $slug failed its integrity check — not restoring it"
+      }
+      try {
+        Copy-Item $t.backup $t.dest -Force
+      } catch [System.IO.IOException] {
+        throw "Can't restore $(Split-Path $t.dest -Leaf) — if the game is running, close it and retry"
+      }
     } elseif (Test-Path $t.dest) {
       Remove-Item $t.dest -Force   # no pre-existing file: Chamber created it
     }
@@ -452,25 +465,35 @@ function Get-VerifiedRemoteCatalog($release) {
 
 function Invoke-CheckUpdate {
   try {
-    $release = Get-LatestRelease
-    $remote  = (Get-VerifiedRemoteCatalog $release).catalog
-    $local   = Get-LocalCatalog
+    # A 404 on releases/latest means nothing is published yet — that's a
+    # valid state, not an outage; only real network failures are "offline".
+    $release = $null
+    try { $release = Get-LatestRelease }
+    catch {
+      $status = $null
+      try { $status = [int]$_.Exception.Response.StatusCode } catch { Write-Verbose "No HTTP status on error: $_" }
+      if ($status -ne 404) { throw }
+    }
+    $local  = Get-LocalCatalog
+    $remote = if ($release) { (Get-VerifiedRemoteCatalog $release).catalog } else { $null }
 
-    $appLatest = ($release.tag_name -replace '^v', '')
     $localVersions = @{}
     foreach ($g in $local.games) { $localVersions[$g.slug] = $g.version }
     $configUpdates = @()
-    foreach ($g in $remote.games) {
-      if (Test-VersionNewer $g.version $localVersions[$g.slug]) { $configUpdates += $g.slug }
+    if ($remote) {
+      foreach ($g in $remote.games) {
+        if (Test-VersionNewer $g.version $localVersions[$g.slug]) { $configUpdates += $g.slug }
+      }
     }
+    $appLatest = if ($release) { $release.tag_name -replace '^v', '' } else { $null }
     Out-Json ([pscustomobject]@{
       appCurrent         = $AppVersion
       appLatest          = $appLatest
       appUpdateAvailable = (Test-VersionNewer $appLatest $AppVersion)
-      releaseUrl         = $release.html_url
-      releaseNotes       = $release.name
+      releaseUrl         = if ($release) { $release.html_url } else { $null }
+      releaseNotes       = if ($release) { $release.name } else { $null }
       catalogCurrent     = $local.catalogVersion
-      catalogLatest      = $remote.catalogVersion
+      catalogLatest      = if ($remote) { $remote.catalogVersion } else { $null }
       configUpdates      = $configUpdates
     })
   } catch {

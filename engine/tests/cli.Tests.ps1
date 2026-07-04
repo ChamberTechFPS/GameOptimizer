@@ -1,4 +1,4 @@
-<#
+﻿<#
   Pester 5 tests for engine/lib.ps1.
   Cross-platform: pure string/logic functions run anywhere pwsh does;
   Windows-only detection functions (Steam/Epic/registry) are not covered here.

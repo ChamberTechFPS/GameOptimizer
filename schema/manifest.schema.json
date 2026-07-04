@@ -5,7 +5,7 @@
   "required": ["name", "slug", "platform", "detect"],
   "additionalProperties": false,
   "properties": {
-    "name": { "type": "string" },
+    "name": { "type": "string", "minLength": 1 },
     "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
     "platform": { "enum": ["steam", "epic", "riot", "other"] },
     "guideOnly": { "type": "boolean" },
@@ -21,17 +21,33 @@
     },
     "targets": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "required": ["template", "dest"],
         "additionalProperties": false,
         "properties": {
-          "template": { "type": "string" },
-          "dest": { "type": "string" },
+          "template": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]*[A-Za-z0-9_-]$",
+            "description": "Leaf filename inside the game folder — no separators or traversal"
+          },
+          "dest": {
+            "type": "string",
+            "pattern": "^\\{(localappdata|appdata|documents|steamuserdata|custom)\\}(/[A-Za-z0-9][A-Za-z0-9 ._()-]*)+$",
+            "description": "Must be rooted at an allowlisted token; the engine re-validates at runtime"
+          },
           "readOnlyAfterApply": { "type": "boolean" }
         }
       }
     },
-    "variables": { "type": "array", "items": { "type": "string" } }
-  }
+    "variables": {
+      "type": "array",
+      "items": { "enum": ["refreshRate", "resolutionWidth", "resolutionHeight"] },
+      "description": "Only variables the engine actually produces (Get-SystemVariables)"
+    }
+  },
+  "if": { "properties": { "guideOnly": { "const": true } }, "required": ["guideOnly"] },
+  "then": { "not": { "required": ["targets"] } },
+  "else": { "required": ["targets"] }
 }

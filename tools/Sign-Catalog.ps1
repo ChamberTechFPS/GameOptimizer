@@ -1,4 +1,4 @@
-#Requires -Version 7
+﻿#Requires -Version 7
 <#
   Sign catalog.json with the offline maintainer key, producing
   catalog.json.sig (RSA-3072 + SHA-256, PKCS#1 v1.5 — verified by
