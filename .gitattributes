@@ -3,3 +3,6 @@
 # (Windows autocrlf) would break both. Force LF everywhere, always.
 * text=auto eol=lf
 *.sig binary
+*.png binary
+*.ico binary
+*.icns binary
