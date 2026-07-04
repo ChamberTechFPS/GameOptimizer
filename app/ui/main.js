@@ -147,7 +147,10 @@ async function scan() {
   try {
     render(await engine("scan"));
   } catch (e) {
-    $("game-list").innerHTML = `<p class="loading">Scan failed: ${e}</p>`;
+    const p = document.createElement("p");
+    p.className = "loading";
+    p.textContent = `Scan failed: ${e}`;
+    $("game-list").replaceChildren(p);
   }
 }
 
