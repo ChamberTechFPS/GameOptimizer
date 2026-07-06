@@ -7,7 +7,7 @@
   "properties": {
     "name": { "type": "string", "minLength": 1 },
     "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-    "platform": { "enum": ["steam", "epic", "riot", "other"] },
+    "platform": { "enum": ["steam", "epic", "riot", "battlenet", "ea", "other"] },
     "guideOnly": { "type": "boolean" },
     "detect": {
       "type": "object",

@@ -3,7 +3,7 @@
 **Per-game competitive settings, applied and tracked with one click.** Companion to the [Chamber Playbook](https://github.com/ChamberTechFPS/Chamber-Playbook) — the playbook tunes Windows, this tunes your games.
 
 - ✅ **Status tracking** — see per game whether Chamber settings are Applied, Drifted (changed since apply), or Not applied
-- 📁 **Custom locations** — installed somewhere non-standard? Auto-detection always runs first, but you can point Chamber at any folder per game and it's remembered
+- 📁 **Custom locations** — installed somewhere non-standard? Auto-detection always runs first, but you can point Chamber at any folder per game and it's remembered. Add extra **scan folders** (e.g. `D:\Games`) under **Folders** and detection checks them too
 - 🔄 **Live config updates** — new and updated game configs are pulled from this repo automatically; the app shows a banner when they're available, no reinstall needed
 - 💾 **Every change backed up** — one-click revert restores your original files
 - 🛡️ **Anti-cheat safe** — config files only; no injection, no memory modification. VAC / EAC / Vanguard safe
@@ -21,7 +21,11 @@ Chamber-GameOptimizer/
 
 Each game is a folder with a `manifest.json` declaring how to detect the install (Steam appId, Epic app name, or paths) and which files to write where. The engine backs up the existing file, applies the template (auto-filling `{{refreshRate}}` etc. from your hardware), and records a SHA-256 hash. Status is hash comparison — no guesswork:
 
-Path tokens in `dest`/`detect.paths` resolve at apply time: `{steamuserdata}` (most-recently-used Steam account), `{localappdata}`, `{appdata}`, `{documents}`, and `{custom}` — the folder the user picked for that game via **Set location** (auto-detection is always tried first; the custom folder is a fallback). Set `detect.customLabel` to control the folder-picker prompt.
+Path tokens in `dest`/`detect.paths` resolve at apply time: `{steamuserdata}` (most-recently-used Steam account), `{localappdata}`, `{appdata}`, `{documents}`, and `{custom}` — the folder the user picked for that game via **Set location** (auto-detection is always tried first; the custom folder is a fallback). Set `detect.customLabel` to control the folder-picker prompt. `detect.paths` may additionally use `{scan}`, which fans out across every scan folder the user added under **Folders** — it is detection-only and rejected in `dest`.
+
+### Testing configs offline
+
+**Folders → Local configs source** points the app at a folder of game configs (one subfolder per game, same layout as `games/`) that shadows both downloaded and bundled configs. Local-source configs skip the signed-catalog integrity check — they're your own working files — so you can iterate on a new game's manifest and template without touching the update channel. Games picked up this way are marked *local config* in the UI.
 
 | Status | Meaning |
 |---|---|
