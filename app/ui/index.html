@@ -21,7 +21,10 @@
         <span class="brand-sub">by ChamberTech · v<span id="app-version">0.1.0</span></span>
       </div>
     </div>
-    <button id="rescan-btn" class="btn">Rescan</button>
+    <div class="topbar-actions">
+      <button id="folders-btn" class="btn">Folders</button>
+      <button id="rescan-btn" class="btn">Rescan</button>
+    </div>
   </header>
 
   <section class="stats">
@@ -46,6 +49,37 @@
       <div class="modal-actions">
         <button id="modal-download" class="btn btn-accent">Get it on GitHub</button>
         <button id="modal-close" class="btn btn-ghost">Not now</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="folders-modal" class="modal-overlay hidden">
+    <div class="modal modal-wide">
+      <h2>Folders</h2>
+
+      <div class="folder-section">
+        <div class="folder-section-head">
+          <h3>Scan folders</h3>
+          <button id="add-scan-folder" class="btn">Add folder</button>
+        </div>
+        <p>Extra places to look for installed games during a scan (e.g. D:\Games).</p>
+        <div id="scan-folder-list" class="folder-list"></div>
+      </div>
+
+      <div class="folder-section">
+        <div class="folder-section-head">
+          <h3>Local configs source</h3>
+          <div class="folder-section-btns">
+            <button id="set-local-source" class="btn">Set folder</button>
+            <button id="clear-local-source" class="btn btn-ghost hidden">Clear</button>
+          </div>
+        </div>
+        <p>A folder of game configs (one subfolder per game with a manifest.json) that overrides bundled and downloaded configs — for testing new configs offline.</p>
+        <div id="local-source-path" class="folder-item none">Not set</div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="folders-close" class="btn btn-ghost">Close</button>
       </div>
     </div>
   </div>

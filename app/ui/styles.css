@@ -185,6 +185,42 @@ body.busy .btn:not(:disabled) { pointer-events: none; opacity: 0.55; }
 .modal p { color: var(--text-dim); font-size: 13px; margin-bottom: 18px; line-height: 1.5; }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
 
+.topbar-actions { display: flex; gap: 10px; }
+
+.modal-wide { width: min(560px, 92vw); }
+.modal h3 { font-size: 13px; font-weight: 600; }
+.folder-section { margin-bottom: 18px; }
+.folder-section p { margin-bottom: 10px; }
+.folder-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.folder-section-btns { display: flex; gap: 6px; }
+.folder-list { display: flex; flex-direction: column; gap: 6px; }
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1b2029;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 6px 6px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.folder-item span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
+}
+.folder-item.none { color: var(--text-faint); font-style: italic; padding: 8px 10px; }
+.folder-empty { color: var(--text-faint); font-size: 12px; }
+
 .row-path {
   font-size: 12px;
   color: var(--text-faint);

@@ -26,7 +26,13 @@ function toast(message, kind = "info") {
   toastTimer = setTimeout(() => el.classList.add("hidden"), 5000);
 }
 
-const PLATFORM_LABEL = { steam: "Steam", epic: "Epic Games", riot: "Riot" };
+const PLATFORM_LABEL = {
+  steam: "Steam",
+  epic: "Epic Games",
+  riot: "Riot",
+  battlenet: "Battle.net",
+  ea: "EA app",
+};
 
 const BADGE = {
   applied: { cls: "applied", label: "Applied" },
@@ -38,13 +44,14 @@ const BADGE = {
 
 function meta(g) {
   const platform = PLATFORM_LABEL[g.platform] ?? g.platform;
+  const local = g.source === "local" ? " · local config" : "";
   if (g.status === "applied" && g.appliedAt)
-    return `${platform} · applied ${new Date(g.appliedAt).toLocaleDateString()}`;
-  if (g.status === "drifted") return `${platform} · config changed since apply`;
-  if (g.status === "guide") return `${platform} · settings stored server-side`;
+    return `${platform} · applied ${new Date(g.appliedAt).toLocaleDateString()}${local}`;
+  if (g.status === "drifted") return `${platform} · config changed since apply${local}`;
+  if (g.status === "guide") return `${platform} · settings stored server-side${local}`;
   if (g.status === "not-installed")
-    return g.customPath ? `${platform} · custom folder` : `${platform} · not detected`;
-  return `${platform} · not yet optimized`;
+    return (g.customPath ? `${platform} · custom folder` : `${platform} · not detected`) + local;
+  return `${platform} · not yet optimized${local}`;
 }
 
 // Revert is two-step: first click arms it, second click within 3s confirms
@@ -242,6 +249,94 @@ function closeModal() {
   $("modal").classList.add("hidden");
 }
 
+// ---------- Folders modal (scan folders + local config source) ----------
+
+async function refreshFolders() {
+  const s = await engine("get-settings");
+  const list = $("scan-folder-list");
+  list.innerHTML = "";
+  const folders = s.scanFolders ?? [];
+  if (folders.length === 0) {
+    const p = document.createElement("div");
+    p.className = "folder-empty";
+    p.textContent = "No scan folders added yet.";
+    list.append(p);
+  }
+  for (const f of folders) {
+    const row = document.createElement("div");
+    row.className = "folder-item";
+    const span = document.createElement("span");
+    span.textContent = f;
+    span.title = f;
+    const remove = document.createElement("button");
+    remove.className = "btn btn-ghost";
+    remove.textContent = "Remove";
+    remove.onclick = () => folderAction("remove-scan-folder", f);
+    row.append(span, remove);
+    list.append(row);
+  }
+
+  const src = $("local-source-path");
+  src.classList.toggle("none", !s.localSource);
+  src.textContent = s.localSource || "Not set";
+  src.title = s.localSource || "";
+  $("clear-local-source").classList.toggle("hidden", !s.localSource);
+}
+
+async function folderAction(action, path) {
+  if (busy) return;
+  busy = true;
+  document.body.classList.add("busy");
+  try {
+    try {
+      await engine(action, null, path ?? null);
+    } catch (e) {
+      toast(`Couldn't update folders: ${errText(e)}`, "error");
+    }
+    await refreshFolders().catch(() => {});
+    await scan();
+  } finally {
+    busy = false;
+    document.body.classList.remove("busy");
+  }
+}
+
+function closeFolders() {
+  $("folders-modal").classList.add("hidden");
+}
+
+$("folders-btn").onclick = async () => {
+  $("folders-modal").classList.remove("hidden");
+  try {
+    await refreshFolders();
+  } catch (e) {
+    toast(`Couldn't load folder settings: ${errText(e)}`, "error");
+  }
+};
+$("folders-close").onclick = closeFolders;
+$("folders-modal").onclick = (e) => {
+  if (e.target === e.currentTarget) closeFolders();
+};
+$("add-scan-folder").onclick = async () => {
+  if (busy) return;
+  const picked = await open({
+    directory: true,
+    multiple: false,
+    title: "Add a folder to scan for games",
+  });
+  if (picked) await folderAction("add-scan-folder", picked);
+};
+$("set-local-source").onclick = async () => {
+  if (busy) return;
+  const picked = await open({
+    directory: true,
+    multiple: false,
+    title: "Select your local game-configs folder",
+  });
+  if (picked) await folderAction("set-local-source", picked);
+};
+$("clear-local-source").onclick = () => folderAction("clear-local-source");
+
 $("rescan-btn").onclick = scan;
 $("update-dismiss").onclick = () => $("update-banner").classList.add("hidden");
 $("modal-close").onclick = closeModal;
@@ -249,7 +344,10 @@ $("modal").onclick = (e) => {
   if (e.target === e.currentTarget) closeModal();
 };
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeModal();
+  if (e.key === "Escape") {
+    closeModal();
+    closeFolders();
+  }
 });
 $("update-btn").onclick = async () => {
   if (busy) return;

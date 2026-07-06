@@ -4,6 +4,10 @@
   Windows-only detection functions (Steam/Epic/registry) are not covered here.
 #>
 
+# Discovery-time constant for -Skip: some tests exercise Windows path
+# expansion (backslashes) or CIM and can't run on the Linux CI leg.
+$IsWindowsHost = $env:OS -eq 'Windows_NT'
+
 BeforeAll {
   $env:CHAMBER_DATA_DIR = Join-Path $TestDrive 'data'
   . (Join-Path (Split-Path $PSScriptRoot -Parent) 'lib.ps1')
@@ -243,5 +247,130 @@ Describe 'Overrides round-trip' {
   }
   It 'rejects a nonexistent folder' {
     { Set-Override 'cs2' (Join-Path $TestDrive 'nope') } | Should -Throw '*not found*'
+  }
+}
+
+Describe 'App settings round-trip' {
+  BeforeEach { Remove-Item $SettingsFile -ErrorAction SilentlyContinue }
+  AfterAll   { Remove-Item $SettingsFile -ErrorAction SilentlyContinue }
+
+  It 'defaults to no scan folders and no local source' {
+    $s = Get-AppSettings
+    @($s.scanFolders).Count | Should -Be 0
+    $s.localSource | Should -BeNullOrEmpty
+  }
+  It 'adds, dedupes, and removes scan folders' {
+    $f = Join-Path $TestDrive 'scanroot'
+    New-Item -ItemType Directory -Force -Path $f | Out-Null
+    Add-ScanFolder $f
+    Add-ScanFolder $f
+    @((Get-AppSettings).scanFolders).Count | Should -Be 1
+    Remove-ScanFolder (Resolve-Path $f).Path
+    @((Get-AppSettings).scanFolders).Count | Should -Be 0
+  }
+  It 'rejects a nonexistent scan folder' {
+    { Add-ScanFolder (Join-Path $TestDrive 'nope-scan') } | Should -Throw '*not found*'
+  }
+  It 'sets and clears the local source' {
+    $f = Join-Path $TestDrive 'localsrc'
+    New-Item -ItemType Directory -Force -Path $f | Out-Null
+    Set-LocalSource $f
+    (Get-AppSettings).localSource | Should -Be (Resolve-Path $f).Path
+    Clear-LocalSource
+    (Get-AppSettings).localSource | Should -BeNullOrEmpty
+  }
+  It 'rejects a nonexistent local source' {
+    { Set-LocalSource (Join-Path $TestDrive 'nope-src') } | Should -Throw '*not found*'
+  }
+}
+
+Describe 'Manifest source merge' {
+  BeforeAll {
+    $script:src = Join-Path $TestDrive 'local-src'
+    foreach ($d in 'cs2', 'newgame', 'mismatch') {
+      New-Item -ItemType Directory -Force -Path (Join-Path $script:src $d) | Out-Null
+    }
+    Set-Content (Join-Path $script:src 'cs2/manifest.json') -Value `
+      '{"name":"CS2 Local","slug":"cs2","platform":"steam","detect":{},"targets":[]}'
+    Set-Content (Join-Path $script:src 'newgame/manifest.json') -Value `
+      '{"name":"New Game","slug":"newgame","platform":"steam","detect":{},"targets":[]}'
+    # slug/folder mismatch must be dropped: the folder name is how apply
+    # resolves the slug back to files on disk
+    Set-Content (Join-Path $script:src 'mismatch/manifest.json') -Value `
+      '{"name":"Bad","slug":"other-slug","platform":"steam","detect":{},"targets":[]}'
+    Set-LocalSource $script:src
+  }
+  AfterAll { Clear-LocalSource }
+
+  It 'local source shadows the bundled copy of the same slug' {
+    $m = @(Get-Manifests | Where-Object { $_.slug -eq 'cs2' })
+    $m.Count    | Should -Be 1
+    $m[0].name   | Should -Be 'CS2 Local'
+    $m[0].source | Should -Be 'local'
+  }
+  It 'exposes brand-new local games alongside bundled ones' {
+    $slugs = (Get-Manifests).slug
+    $slugs | Should -Contain 'newgame'
+    $slugs | Should -Contain 'fortnite'
+  }
+  It 'drops manifests whose slug does not match their folder' {
+    (Get-Manifests).slug | Should -Not -Contain 'other-slug'
+  }
+  It 'Get-GameLocation honors source priority' {
+    (Get-GameLocation 'cs2').source      | Should -Be 'local'
+    (Get-GameLocation 'fortnite').source | Should -Be 'bundled'
+  }
+  It 'Get-GameLocation throws for an unknown slug' {
+    { Get-GameLocation 'no-such-game' } | Should -Throw '*No config folder*'
+  }
+}
+
+Describe '{scan} token detection' {
+  BeforeAll {
+    $script:scanRoot = Join-Path $TestDrive 'scan-root'
+    New-Item -ItemType Directory -Force -Path (Join-Path $script:scanRoot 'Cool Game') | Out-Null
+  }
+  AfterAll { Remove-Item $SettingsFile -ErrorAction SilentlyContinue }
+
+  It 'does not match when no scan folders are configured' {
+    Remove-Item $SettingsFile -ErrorAction SilentlyContinue
+    $m = [pscustomobject]@{ detect = [pscustomobject]@{ paths = @('{scan}/Cool Game') } }
+    Test-GameInstalled $m | Should -BeFalse
+  }
+  It 'matches a game folder under a configured scan folder' -Skip:(-not $IsWindowsHost) {
+    Add-ScanFolder $script:scanRoot
+    $m = [pscustomobject]@{ detect = [pscustomobject]@{ paths = @('{scan}/Cool Game') } }
+    Test-GameInstalled $m | Should -BeTrue
+  }
+  It 'does not match a folder absent from every scan folder' -Skip:(-not $IsWindowsHost) {
+    Add-ScanFolder $script:scanRoot
+    $m = [pscustomobject]@{ detect = [pscustomobject]@{ paths = @('{scan}/Missing Game') } }
+    Test-GameInstalled $m | Should -BeFalse
+  }
+  It 'rejects {scan} in a dest path' {
+    Test-SafeDest '{scan}/evil/file.cfg' | Should -BeFalse
+  }
+}
+
+Describe 'Apply from a local source' -Skip:(-not $IsWindowsHost) {
+  BeforeAll {
+    $env:LOCALAPPDATA = Join-Path $TestDrive 'ApplyLocalAppData'
+    New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA | Out-Null
+    $script:applySrc = Join-Path $TestDrive 'apply-src'
+    New-Item -ItemType Directory -Force -Path (Join-Path $script:applySrc 'localonly') | Out-Null
+    Set-Content (Join-Path $script:applySrc 'localonly/manifest.json') -Value `
+      '{"name":"Local Only","slug":"localonly","platform":"steam","detect":{},"targets":[{"template":"test.cfg","dest":"{localappdata}/LocalOnly/test.cfg"}],"variables":["refreshRate"]}'
+    Set-Content (Join-Path $script:applySrc 'localonly/test.cfg') -Value 'fps_max {{refreshRate}}' -NoNewline
+    Set-LocalSource $script:applySrc
+  }
+  AfterAll { Clear-LocalSource }
+
+  It 'applies without a catalog entry (integrity gate is cache/bundled-only)' {
+    Invoke-Apply 'localonly' | Out-Null
+    $dest = Join-Path $env:LOCALAPPDATA 'LocalOnly\test.cfg'
+    Test-Path $dest | Should -BeTrue
+    Get-Content $dest -Raw | Should -Match 'fps_max \d+'
+    Invoke-Revert 'localonly' | Out-Null
+    Test-Path $dest | Should -BeFalse
   }
 }

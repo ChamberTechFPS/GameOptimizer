@@ -3,3 +3,6 @@ app/src-tauri/gen/
 node_modules/
 *.log
 .DS_Store
+._*
+# Offline test config source (see local-games/README.md)
+local-games/

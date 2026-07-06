@@ -8,7 +8,9 @@
 $Repo       = 'ChamberTechFPS/GameOptimizer'   # <- update if repo name differs
 $AppVersion = '0.1.0'
 
-$RepoRoot  = Split-Path $PSScriptRoot -Parent
+# Callers (notably Tauri's resource_dir()) can hand us a \\?\-prefixed
+# extended-length path, which Windows PowerShell's path cmdlets cannot parse.
+$RepoRoot  = (Split-Path $PSScriptRoot -Parent) -replace '^\\\\\?\\', ''
 $DataDir   = if ($env:CHAMBER_DATA_DIR) { $env:CHAMBER_DATA_DIR }
              elseif ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'ChamberTech\GameOptimizer' }
              else { Join-Path ([IO.Path]::GetTempPath()) 'ChamberTech\GameOptimizer' }
@@ -16,6 +18,7 @@ $CacheDir  = Join-Path $DataDir 'games'
 $BackupDir = Join-Path $DataDir 'backups'
 $StateFile = Join-Path $DataDir 'state.json'
 $OverrideFile = Join-Path $DataDir 'overrides.json'
+$SettingsFile = Join-Path $DataDir 'settings.json'
 $HighWaterFile = Join-Path $DataDir 'catalog-version'
 
 # RSA-3072 public key for catalog signature verification. The private key
@@ -38,10 +41,26 @@ function ConvertTo-Hashtable($obj) {
   return $ht
 }
 
-function Get-GamesDir {
-  # Updated configs (pulled from GitHub) take priority over the bundled copy
-  if (Test-Path $CacheDir) { return $CacheDir }
-  return (Join-Path $RepoRoot 'games')
+function Get-GameSourceDirs {
+  # Ordered by priority: the user's local dev source shadows the updated
+  # cache (pulled from GitHub), which shadows the bundled copy.
+  $dirs = [ordered]@{}
+  $local = (Get-AppSettings).localSource
+  if ($local -and (Test-Path $local)) { $dirs['local'] = $local }
+  if (Test-Path $CacheDir) { $dirs['cache'] = $CacheDir }
+  $dirs['bundled'] = Join-Path $RepoRoot 'games'
+  return $dirs
+}
+
+function Get-GameLocation($slug) {
+  $sources = Get-GameSourceDirs
+  foreach ($srcName in $sources.Keys) {
+    $dir = Join-Path $sources[$srcName] $slug
+    if (Test-Path (Join-Path $dir 'manifest.json')) {
+      return [pscustomobject]@{ dir = $dir; source = $srcName }
+    }
+  }
+  throw "No config folder found for $slug"
 }
 
 function Get-LocalCatalog {
@@ -51,10 +70,29 @@ function Get-LocalCatalog {
 }
 
 function Get-Manifests {
-  Get-ChildItem (Get-GamesDir) -Directory | ForEach-Object {
-    $m = Join-Path $_.FullName 'manifest.json'
-    if (Test-Path $m) { Get-Content $m -Raw | ConvertFrom-Json }
+  # Merge all sources; the first source that provides a slug wins.
+  $seen = @{}
+  $out = @()
+  $sources = Get-GameSourceDirs
+  foreach ($srcName in $sources.Keys) {
+    foreach ($d in @(Get-ChildItem $sources[$srcName] -Directory -ErrorAction SilentlyContinue)) {
+      if ($seen.ContainsKey($d.Name)) { continue }
+      $mPath = Join-Path $d.FullName 'manifest.json'
+      if (-not (Test-Path $mPath)) { continue }
+      try { $m = Get-Content $mPath -Raw | ConvertFrom-Json }
+      catch { Write-Verbose "Skipping unreadable manifest $mPath : $_"; continue }
+      # The folder name is how the slug resolves back to files on disk;
+      # a mismatch (or unsafe slug) would break apply, so drop it early.
+      if (-not (Test-SafeSlug $m.slug) -or $m.slug -cne $d.Name) {
+        Write-Verbose "Skipping $mPath : slug '$($m.slug)' does not match folder '$($d.Name)'"
+        continue
+      }
+      $seen[$d.Name] = $true
+      $m | Add-Member -NotePropertyName source -NotePropertyValue $srcName -Force
+      $out += $m
+    }
   }
+  return $out
 }
 
 function Get-State {
@@ -87,6 +125,59 @@ function Set-Override($slug, $path) {
 function Remove-Override($slug) {
   $overrides = Get-Overrides
   if ($overrides.ContainsKey($slug)) { $overrides.Remove($slug); Save-Overrides $overrides }
+}
+
+# ---------- app settings (scan folders + local config source) ----------
+
+function Get-AppSettings {
+  $s = @{ scanFolders = @(); localSource = $null }
+  if (Test-Path $SettingsFile) {
+    $j = Get-Content $SettingsFile -Raw | ConvertFrom-Json
+    if ($j.scanFolders) { $s.scanFolders = @($j.scanFolders) }
+    if ($j.localSource) { $s.localSource = $j.localSource }
+  }
+  return $s
+}
+
+function Save-AppSettings($settings) {
+  Out-Json (Get-SettingsView $settings) | Set-Content $SettingsFile -Encoding UTF8
+}
+
+function Get-SettingsView($settings = $null) {
+  if (-not $settings) { $settings = Get-AppSettings }
+  return [pscustomobject]@{
+    scanFolders = @($settings.scanFolders)
+    localSource = $settings.localSource
+  }
+}
+
+function Add-ScanFolder($path) {
+  if (-not (Test-Path $path)) { throw "Folder not found: $path" }
+  $resolved = (Resolve-Path $path).Path
+  $s = Get-AppSettings
+  if (@($s.scanFolders) -notcontains $resolved) {   # -contains is case-insensitive
+    $s.scanFolders = @($s.scanFolders) + $resolved
+    Save-AppSettings $s
+  }
+}
+
+function Remove-ScanFolder($path) {
+  $s = Get-AppSettings
+  $s.scanFolders = @($s.scanFolders | Where-Object { $_ -ne $path })
+  Save-AppSettings $s
+}
+
+function Set-LocalSource($path) {
+  if (-not (Test-Path $path)) { throw "Folder not found: $path" }
+  $s = Get-AppSettings
+  $s.localSource = (Resolve-Path $path).Path
+  Save-AppSettings $s
+}
+
+function Clear-LocalSource {
+  $s = Get-AppSettings
+  $s.localSource = $null
+  Save-AppSettings $s
 }
 
 function Get-Sha256($path) { (Get-FileHash -Path $path -Algorithm SHA256).Hash }
@@ -205,8 +296,17 @@ function Test-GameInstalled($manifest, $override = $null) {
   if ($d.steamAppId)  { if (Test-SteamGame $d.steamAppId)   { return $true } }
   if ($d.epicAppName) { if (Test-EpicGame $d.epicAppName)   { return $true } }
   if ($d.paths) {
+    $scanFolders = @((Get-AppSettings).scanFolders)
     foreach ($p in $d.paths) {
       if ($p -like '*{custom}*' -and -not $override) { continue }
+      if ($p -like '*{scan}*') {
+        # {scan} fans out across every user-configured scan folder; it is a
+        # detection-only token — Test-SafeDest keeps it out of dest paths.
+        foreach ($root in $scanFolders) {
+          if (Test-Path (Expand-PathTokens ($p.Replace('{scan}', $root)) $override)) { return $true }
+        }
+        continue
+      }
       if (Test-Path (Expand-PathTokens $p $override)) { return $true }
     }
   }
@@ -317,6 +417,7 @@ function Invoke-Scan {
       customPath = if ($override) { $override } else { $null }
       customLabel = if ($m.detect.customLabel) { $m.detect.customLabel } else { $null }
       needsPath = [bool]((Test-UsesCustom $m) -and -not $override)
+      source    = $m.source
     }
   }
   Out-Json $results
@@ -327,7 +428,8 @@ function Invoke-Apply($slug) {
   if ($m.guideOnly) { throw "$($m.name) settings are server-side; see its guide instead" }
   $vars = Get-SystemVariables
   $override = Get-Override $slug
-  $gameDir = Join-Path (Get-GamesDir) $slug
+  $loc = Get-GameLocation $slug
+  $gameDir = $loc.dir
   $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
   $gameBackupDir = Join-Path $BackupDir "$slug\$stamp"
   $targets = @()
@@ -339,7 +441,12 @@ function Invoke-Apply($slug) {
     $tplPath = Join-Path $gameDir $t.template
     # Re-check the cached template against the signed catalog at apply time,
     # so a tampered local cache can't slip content past the download check.
-    $fileEntry = @($catEntry.files) | Where-Object { $_.name -eq $t.template } | Select-Object -First 1
+    # A local dev source is exempt: those are the user's own working files
+    # and are expected to differ from the published catalog.
+    $fileEntry = $null
+    if ($loc.source -ne 'local') {
+      $fileEntry = @($catEntry.files) | Where-Object { $_.name -eq $t.template } | Select-Object -First 1
+    }
     if ($fileEntry.sha256 -and ((Get-Sha256 $tplPath) -ne $fileEntry.sha256.ToUpper())) {
       throw "Cached config for $slug failed its integrity check — run update to re-download"
     }
