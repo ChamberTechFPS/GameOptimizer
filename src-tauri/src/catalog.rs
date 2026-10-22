@@ -79,6 +79,10 @@ pub enum Format {
 #[serde(deny_unknown_fields)]
 pub struct FileTarget {
     pub path: String,
+    /// More places the same file can be, such as another launcher's folder. Every copy found
+    /// gets the same settings.
+    #[serde(default)]
+    pub also: Vec<String>,
     pub format: Format,
     #[serde(default)]
     pub lock: bool,
@@ -200,8 +204,10 @@ impl Catalog {
                 return fail(format!("bad process name {p:?}"));
             }
             for f in &g.files {
-                if let Err(e) = check_path(&f.path, true) {
-                    return fail(e);
+                for p in f.paths() {
+                    if let Err(e) = check_path(p, true) {
+                        return fail(e);
+                    }
                 }
                 if f.settings.is_empty() {
                     return fail(format!("{} lists no settings", f.path));
@@ -280,9 +286,30 @@ pub fn expand(path: &str, roots: &HashMap<&str, PathBuf>) -> Result<PathBuf, Str
     Ok(out)
 }
 
-/// Every copy of a game file. A `*` folder matches each folder there that holds the file;
-/// a plain path comes back as is, even before the file exists.
-pub fn expand_all(path: &str, roots: &HashMap<&str, PathBuf>) -> Result<Vec<PathBuf>, String> {
+impl FileTarget {
+    pub fn paths(&self) -> impl Iterator<Item = &String> {
+        std::iter::once(&self.path).chain(&self.also)
+    }
+
+    /// Every copy of the file on this PC, from `path` and `also`. If none exists yet, `path`
+    /// as `expand_all` gives it, so the game reads as "Launch once" like any missing file.
+    pub fn copies(&self, roots: &HashMap<&str, PathBuf>) -> Result<Vec<PathBuf>, String> {
+        let mut seen = HashSet::new();
+        let found: Vec<PathBuf> = self
+            .paths()
+            .filter_map(|p| expand_all(p, roots).ok()) // a root this PC lacks holds no copy
+            .flatten()
+            // Once each, ignoring case like Windows: a second edit in one apply would record
+            // Chamber's own values as the originals.
+            .filter(|p| p.is_file() && seen.insert(p.to_string_lossy().to_ascii_lowercase()))
+            .collect();
+        if found.is_empty() { expand_all(&self.path, roots) } else { Ok(found) }
+    }
+}
+
+/// Every copy of one game file path. A `*` folder matches each folder there that holds the
+/// file; a plain path comes back as is, even before the file exists.
+fn expand_all(path: &str, roots: &HashMap<&str, PathBuf>) -> Result<Vec<PathBuf>, String> {
     check_path(path, true)?;
     let Some((head, tail)) = path.split_once("/*/") else { return Ok(vec![expand(path, roots)?]) };
     let Ok(entries) = std::fs::read_dir(expand(head, roots)?) else { return Ok(Vec::new()) };
@@ -470,7 +497,7 @@ mod tests {
             let game: Game = serde_json::from_slice(&std::fs::read(&path).unwrap())
                 .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
             assert_eq!(path.file_stem().unwrap(), game.slug.as_str(), "{}", path.display());
-            for p in game.files.iter().map(|f| &f.path) {
+            for p in game.files.iter().flat_map(FileTarget::paths) {
                 check_path(p, true).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
             }
             for p in &game.find.paths {

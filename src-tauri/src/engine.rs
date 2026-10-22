@@ -185,7 +185,8 @@ impl Engine {
         let mut rows = Vec::new();
         let mut missing_file = false;
         for f in &g.files {
-            let texts: Vec<String> = catalog::expand_all(&f.path, &roots)
+            let texts: Vec<String> = f
+                .copies(&roots)
                 .unwrap_or_default()
                 .iter()
                 .filter_map(|p| patch::decode(&fs::read(p).ok()?).ok())
@@ -260,7 +261,7 @@ impl Engine {
         let roots = roots(pc, Some(&location));
         let mut targets = Vec::new();
         for f in &g.files {
-            let paths = catalog::expand_all(&f.path, &roots)?;
+            let paths = f.copies(&roots)?;
             if paths.is_empty() {
                 return Err(launch_once(g));
             }
@@ -423,7 +424,7 @@ impl Engine {
         let roots = roots(pc, location.as_deref());
         g.files
             .iter()
-            .filter_map(|f| catalog::expand_all(&f.path, &roots).ok()?.first()?.parent().map(Path::to_path_buf))
+            .filter_map(|f| f.copies(&roots).ok()?.first()?.parent().map(Path::to_path_buf))
             .find(|p| p.is_dir())
             .or(location.filter(|l| l.is_dir()))
             .ok_or_else(|| format!("Couldn't find {}'s settings folder.", g.name))
@@ -697,6 +698,46 @@ mod tests {
         fx.engine.revert(&fx.cat, &fx.pc, "test-game").unwrap();
         assert_eq!(fs::read_to_string(&a).unwrap(), "[DISPLAY]\r\nVSync=1\r\n");
         assert_eq!(fs::read_to_string(&b).unwrap(), "[DISPLAY]\nVSync=0\nFPS=60\n", "the first apply's value comes back");
+    }
+
+    #[test]
+    fn also_paths_cover_each_launchers_copy() {
+        let mut fx = fixture("also");
+        let docs = fx.root.join("docs");
+        fx.pc.roots.insert("documents", docs.clone());
+        let (bnet, steam) = (fx.root.join("local/CoD/players/s.txt0"), docs.join("CoD/players/s.txt0"));
+        fs::create_dir_all(bnet.parent().unwrap()).unwrap();
+        fs::create_dir_all(steam.parent().unwrap()).unwrap();
+        // Battle.net's folder, then Steam's. The last entry repeats `path` by mistake: still one copy.
+        fx.cat.games[0].files = vec![serde_json::from_value(serde_json::json!({
+            "path": "{localappdata}/CoD/players/s.txt0",
+            "also": ["{documents}/CoD/players/s.txt0", "{localappdata}/CoD/players/s.txt0"],
+            "format": "cod",
+            "settings": [{ "key": "VSync@0", "value": "Off", "label": "V-Sync", "why": "w" }]
+        }))
+        .unwrap()];
+        fx.cat.validate().unwrap();
+        assert_eq!(status(&fx).0, "launch-once", "neither launcher has written the file yet");
+
+        fs::write(&steam, "VSync@0;1;2 = On // one of Off, On\n").unwrap();
+        assert_eq!(status(&fx), ("not-optimized", 1), "a Steam copy alone is found");
+        assert_eq!(fx.engine.apply(&fx.cat, &fx.pc, "test-game").unwrap(), 1);
+        assert_eq!(fs::read_to_string(&steam).unwrap(), "VSync@0;1;2 = Off // one of Off, On\n");
+        assert!(!bnet.exists(), "a missing copy is never created");
+
+        fs::write(&bnet, "VSync@0;3;4 = On\n").unwrap();
+        assert_eq!(status(&fx), ("changed", 1), "a Battle.net copy is picked up too");
+        assert_eq!(fx.engine.apply(&fx.cat, &fx.pc, "test-game").unwrap(), 1);
+        assert_eq!(fs::read_to_string(&bnet).unwrap(), "VSync@0;3;4 = Off\n");
+        let state = fx.engine.load_state().unwrap();
+        assert_eq!(state.games["test-game"].applied.as_ref().unwrap().files.len(), 2, "one record per copy");
+
+        fx.engine.revert(&fx.cat, &fx.pc, "test-game").unwrap();
+        assert_eq!(fs::read_to_string(&steam).unwrap(), "VSync@0;1;2 = On // one of Off, On\n");
+        assert_eq!(fs::read_to_string(&bnet).unwrap(), "VSync@0;3;4 = On\n");
+
+        fx.cat.games[0].files[0].also.push("{localappdata}/../x.ini".into());
+        assert!(fx.cat.validate().is_err(), "also paths pass the same path check");
     }
 
     #[test]

@@ -4,6 +4,7 @@
   "tile": "COD",
   "launcher": "battlenet",
   "find": {
+    "steam": 1938090,
     "uninstall": "Call of Duty",
     "paths": [
       "{localappdata}/Activision/Call of Duty"
@@ -16,6 +17,9 @@
   "files": [
     {
       "path": "{localappdata}/Activision/Call of Duty/players/s.1.0.cod26.txt0",
+      "also": [
+        "{documents}/Call of Duty/players/s.1.0.cod26.txt0"
+      ],
       "format": "cod",
       "settings": []
     }
