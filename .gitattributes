@@ -1,8 +1,0 @@
-# The catalog signature covers catalog.json byte-for-byte, and catalog hashes
-# cover the game configs byte-for-byte — line-ending conversion at checkout
-# (Windows autocrlf) would break both. Force LF everywhere, always.
-* text=auto eol=lf
-*.sig binary
-*.png binary
-*.ico binary
-*.icns binary
