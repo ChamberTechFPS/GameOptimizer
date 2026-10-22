@@ -1,0 +1,19 @@
+{
+  "slug": "dota-2",
+  "name": "Dota 2",
+  "tile": "D2",
+  "launcher": "steam",
+  "find": {
+    "steam": 570
+  },
+  "process": [
+    "dota2.exe"
+  ],
+  "files": [
+    {
+      "path": "{install}/game/dota/cfg/video.txt",
+      "format": "kv",
+      "settings": []
+    }
+  ]
+}

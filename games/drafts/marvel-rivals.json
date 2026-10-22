@@ -1,0 +1,23 @@
+{
+  "slug": "marvel-rivals",
+  "name": "Marvel Rivals",
+  "tile": "MR",
+  "launcher": "steam",
+  "find": {
+    "steam": 2767030,
+    "epic": "Marvel Rivals",
+    "paths": [
+      "{localappdata}/Marvel"
+    ]
+  },
+  "process": [
+    "Marvel-Win64-Shipping.exe"
+  ],
+  "files": [
+    {
+      "path": "{localappdata}/Marvel/Saved/Config/Windows/GameUserSettings.ini",
+      "format": "ini",
+      "settings": []
+    }
+  ]
+}

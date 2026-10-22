@@ -1,0 +1,477 @@
+{
+  "version": 1792692547,
+  "games": [
+    {
+      "slug": "cs2",
+      "name": "Counter-Strike 2",
+      "tile": "CS",
+      "launcher": "steam",
+      "find": {
+        "steam": 730
+      },
+      "process": [
+        "cs2.exe"
+      ],
+      "files": [
+        {
+          "path": "{steamuserdata}/730/local/cfg/cs2_video.txt",
+          "format": "kv",
+          "settings": [
+            {
+              "key": "setting.r_player_visibility_mode",
+              "value": "1",
+              "label": "Boost player contrast",
+              "values": {
+                "0": "Disabled",
+                "1": "Enabled"
+              },
+              "why": "Makes player models stand out against the map."
+            },
+            {
+              "key": "setting.videocfg_shadow_quality",
+              "value": "2",
+              "label": "Global shadow quality",
+              "values": {
+                "0": "Low",
+                "1": "Medium",
+                "2": "High",
+                "3": "Very high"
+              },
+              "why": "Kept high on purpose: an enemy's shadow can show before the enemy does."
+            },
+            {
+              "key": "setting.shaderquality",
+              "value": "0",
+              "label": "Shader detail",
+              "values": {
+                "0": "Low",
+                "1": "High"
+              },
+              "why": "Lighting polish you don't need to spot anyone."
+            },
+            {
+              "key": "setting.videocfg_particle_detail",
+              "value": "0",
+              "label": "Particle detail",
+              "values": {
+                "0": "Low",
+                "1": "Medium",
+                "2": "High",
+                "3": "Very high"
+              },
+              "why": "Less smoke, fire, and spark clutter in fights."
+            },
+            {
+              "key": "setting.videocfg_ao_detail",
+              "value": "0",
+              "label": "Ambient occlusion",
+              "values": {
+                "0": "Disabled",
+                "1": "Medium",
+                "2": "High"
+              },
+              "why": "Soft contact shadows that cost frames and show you nothing."
+            },
+            {
+              "key": "setting.videocfg_fsr_detail",
+              "value": "0",
+              "label": "FidelityFX Super Resolution",
+              "values": {
+                "0": "Disabled"
+              },
+              "why": "Upscaling softens distant players."
+            },
+            {
+              "key": "setting.mat_vsync",
+              "value": "0",
+              "label": "V-Sync",
+              "values": {
+                "0": "Disabled",
+                "1": "Enabled"
+              },
+              "why": "V-Sync holds frames back, which adds input lag."
+            },
+            {
+              "key": "setting.r_low_latency",
+              "value": "2",
+              "label": "NVIDIA Reflex",
+              "values": {
+                "0": "Disabled",
+                "1": "Enabled",
+                "2": "Enabled + boost"
+              },
+              "why": "Cuts the delay between your click and the shot on NVIDIA cards. Other cards ignore it."
+            }
+          ]
+        }
+      ],
+      "rev": "18f5c1a1"
+    },
+    {
+      "slug": "fortnite",
+      "name": "Fortnite",
+      "tile": "FN",
+      "launcher": "epic",
+      "find": {
+        "epic": "Fortnite",
+        "paths": [
+          "{localappdata}/FortniteGame"
+        ]
+      },
+      "process": [
+        "FortniteClient-Win64-Shipping.exe"
+      ],
+      "files": [
+        {
+          "path": "{localappdata}/FortniteGame/Saved/Config/WindowsClient/GameUserSettings.ini",
+          "format": "ini",
+          "settings": [
+            {
+              "section": "D3DRHIPreference",
+              "key": "PreferredFeatureLevel",
+              "value": "es31",
+              "label": "Rendering mode",
+              "values": {
+                "es31": "Performance",
+                "sm5": "DirectX 11",
+                "sm6": "DirectX 12"
+              },
+              "why": "Epic's lightweight renderer: far less to draw, the same information on screen."
+            },
+            {
+              "section": "D3DRHIPreference",
+              "key": "PreferredRHI",
+              "value": "dx12",
+              "label": "Graphics API",
+              "values": {
+                "dx11": "DirectX 11",
+                "dx12": "DirectX 12"
+              },
+              "why": "Performance mode runs on DirectX 12."
+            },
+            {
+              "section": "/Script/FortniteGame.FortGameUserSettings",
+              "key": "FrameRateLimit",
+              "value": "{refresh}.000000",
+              "label": "Frame rate limit",
+              "why": "Capped at your monitor's refresh rate for steady frame times."
+            },
+            {
+              "section": "/Script/FortniteGame.FortGameUserSettings",
+              "key": "bUseVSync",
+              "value": "False",
+              "label": "V-Sync",
+              "values": {
+                "False": "Off",
+                "True": "On"
+              },
+              "why": "V-Sync holds frames back, which adds input lag."
+            },
+            {
+              "section": "/Script/FortniteGame.FortGameUserSettings",
+              "key": "LatencyTweak2",
+              "value": "2",
+              "label": "NVIDIA Reflex",
+              "values": {
+                "0": "Off",
+                "1": "On",
+                "2": "On + boost"
+              },
+              "why": "Cuts the delay between your click and the shot on NVIDIA cards. Other cards ignore it."
+            },
+            {
+              "section": "/Script/FortniteGame.FortGameUserSettings",
+              "key": "bMotionBlur",
+              "value": "False",
+              "label": "Motion blur",
+              "values": {
+                "False": "Off",
+                "True": "On"
+              },
+              "why": "Blur hides the movement you need to track."
+            },
+            {
+              "section": "/Script/FortniteGame.FortGameUserSettings",
+              "key": "bRayTracing",
+              "value": "False",
+              "label": "Ray tracing",
+              "values": {
+                "False": "Off",
+                "True": "On"
+              },
+              "why": "A large frame cost with no competitive value."
+            },
+            {
+              "section": "ScalabilityGroups",
+              "key": "sg.ResolutionQuality",
+              "value": "100",
+              "label": "3D resolution",
+              "values": {
+                "100": "100%"
+              },
+              "why": "Anything below your native resolution makes players blurrier."
+            },
+            {
+              "section": "ScalabilityGroups",
+              "key": "sg.ViewDistanceQuality",
+              "value": "2",
+              "label": "View distance",
+              "values": {
+                "0": "Near",
+                "1": "Medium",
+                "2": "Far",
+                "3": "Epic"
+              },
+              "why": "Kept far on purpose: players and builds at range keep drawing."
+            },
+            {
+              "section": "ScalabilityGroups",
+              "key": "sg.ShadowQuality",
+              "value": "0",
+              "label": "Shadows",
+              "values": {
+                "0": "Off",
+                "1": "Medium",
+                "2": "High",
+                "3": "Epic"
+              },
+              "why": "Shadows redraw the scene from each light. Off skips that work."
+            },
+            {
+              "section": "ScalabilityGroups",
+              "key": "sg.AntiAliasingQuality",
+              "value": "0",
+              "label": "Anti-aliasing",
+              "values": {
+                "0": "Off",
+                "1": "Medium",
+                "2": "High",
+                "3": "Epic"
+              },
+              "why": "Edge smoothing blurs distant players."
+            },
+            {
+              "section": "ScalabilityGroups",
+              "key": "sg.PostProcessQuality",
+              "value": "0",
+              "label": "Post processing",
+              "values": {
+                "0": "Low",
+                "1": "Medium",
+                "2": "High",
+                "3": "Epic"
+              },
+              "why": "Removes bloom and haze layered over the scene."
+            },
+            {
+              "section": "ScalabilityGroups",
+              "key": "sg.EffectsQuality",
+              "value": "0",
+              "label": "Effects",
+              "values": {
+                "0": "Low",
+                "1": "Medium",
+                "2": "High",
+                "3": "Epic"
+              },
+              "why": "Less particle clutter when fights get busy."
+            },
+            {
+              "section": "ScalabilityGroups",
+              "key": "sg.TextureQuality",
+              "value": "0",
+              "label": "Textures",
+              "values": {
+                "0": "Low",
+                "1": "Medium",
+                "2": "High",
+                "3": "Epic"
+              },
+              "why": "Frees video memory. Sharper textures don't show you anything new."
+            }
+          ]
+        }
+      ],
+      "rev": "edbf2701"
+    },
+    {
+      "slug": "rocket-league",
+      "name": "Rocket League",
+      "tile": "RL",
+      "launcher": "epic",
+      "find": {
+        "steam": 252950,
+        "epic": "Rocket League",
+        "paths": [
+          "{documents}/My Games/Rocket League"
+        ]
+      },
+      "process": [
+        "RocketLeague.exe"
+      ],
+      "files": [
+        {
+          "path": "{documents}/My Games/Rocket League/TAGame/Config/TASystemSettings.ini",
+          "format": "ini",
+          "settings": [
+            {
+              "section": "SystemSettings",
+              "key": "DynamicShadows",
+              "value": "False",
+              "label": "Dynamic shadows",
+              "values": {
+                "False": "Off",
+                "True": "On"
+              },
+              "why": "Moving shadows that tell you nothing about the ball."
+            },
+            {
+              "section": "SystemSettings",
+              "key": "MotionBlur",
+              "value": "False",
+              "label": "Motion blur",
+              "values": {
+                "False": "Off",
+                "True": "On"
+              },
+              "why": "Blur smears the ball during fast plays."
+            },
+            {
+              "section": "SystemSettings",
+              "key": "DepthOfField",
+              "value": "False",
+              "label": "Depth of field",
+              "values": {
+                "False": "Off",
+                "True": "On"
+              },
+              "why": "Blurs the far end of the field."
+            },
+            {
+              "section": "SystemSettings",
+              "key": "AmbientOcclusion",
+              "value": "False",
+              "label": "Ambient occlusion",
+              "values": {
+                "False": "Off",
+                "True": "On"
+              },
+              "why": "Soft contact shadows that cost frames."
+            },
+            {
+              "section": "SystemSettings",
+              "key": "Bloom",
+              "value": "False",
+              "label": "Bloom",
+              "values": {
+                "False": "Off",
+                "True": "On"
+              },
+              "why": "Glow from boosts and goal explosions can hide the ball."
+            },
+            {
+              "section": "SystemSettings",
+              "key": "LensFlares",
+              "value": "False",
+              "label": "Lens flares",
+              "values": {
+                "False": "Off",
+                "True": "On"
+              },
+              "why": "Pure decoration over the pitch."
+            }
+          ]
+        }
+      ],
+      "rev": "4b4cd890"
+    },
+    {
+      "slug": "valorant",
+      "name": "Valorant",
+      "tile": "VA",
+      "launcher": "riot",
+      "find": {
+        "uninstall": "VALORANT",
+        "paths": [
+          "{localappdata}/VALORANT"
+        ]
+      },
+      "process": [
+        "VALORANT-Win64-Shipping.exe"
+      ],
+      "manual": [
+        {
+          "label": "Display mode",
+          "value": "Fullscreen",
+          "why": "Exclusive fullscreen has the lowest input latency."
+        },
+        {
+          "label": "Multithreaded rendering",
+          "value": "On",
+          "why": "Lets Valorant spread its work across your CPU cores."
+        },
+        {
+          "label": "Material quality",
+          "value": "Low",
+          "why": "Surface detail you don't need to spot anyone."
+        },
+        {
+          "label": "Texture quality",
+          "value": "Low",
+          "why": "Frees video memory. Sharper walls show you nothing new."
+        },
+        {
+          "label": "Detail quality",
+          "value": "Low",
+          "why": "Removes small map clutter."
+        },
+        {
+          "label": "UI quality",
+          "value": "Low",
+          "why": "Same information, less to draw."
+        },
+        {
+          "label": "Vignette",
+          "value": "Off",
+          "why": "Darkens the edges of your screen."
+        },
+        {
+          "label": "V-Sync",
+          "value": "Off",
+          "why": "V-Sync holds frames back, which adds input lag."
+        },
+        {
+          "label": "Anti-aliasing",
+          "value": "MSAA 2x",
+          "why": "Smooths edges without blurring heads."
+        },
+        {
+          "label": "Improve clarity",
+          "value": "Off",
+          "why": "Adds processing you don't need."
+        },
+        {
+          "label": "Bloom",
+          "value": "Off",
+          "why": "Glow can hide enemies near bright lights."
+        },
+        {
+          "label": "Distortion",
+          "value": "Off",
+          "why": "Warps the image around abilities."
+        },
+        {
+          "label": "Cast shadows",
+          "value": "Off",
+          "why": "Only affects first-person shadows."
+        },
+        {
+          "label": "NVIDIA Reflex Low Latency",
+          "value": "On + Boost",
+          "why": "Cuts the delay between your click and the shot on NVIDIA cards."
+        }
+      ],
+      "rev": "166a2ff6"
+    }
+  ]
+}

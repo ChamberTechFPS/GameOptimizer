@@ -1,0 +1,17 @@
+{
+  "slug": "delta-force",
+  "name": "Delta Force",
+  "tile": "DF",
+  "launcher": "steam",
+  "find": {
+    "steam": 2507950
+  },
+  "process": [],
+  "files": [
+    {
+      "path": "{install}/Game/DeltaForce/Saved/Config/WindowsClient/GameUserSettings.ini",
+      "format": "ini",
+      "settings": []
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "slug": "the-finals",
+  "name": "THE FINALS",
+  "tile": "TF",
+  "launcher": "steam",
+  "find": {
+    "steam": 2073850,
+    "paths": [
+      "{localappdata}/Discovery"
+    ]
+  },
+  "process": [
+    "Discovery.exe"
+  ],
+  "files": [
+    {
+      "path": "{localappdata}/Discovery/Saved/Config/WindowsClient/GameUserSettings.ini",
+      "format": "ini",
+      "settings": []
+    }
+  ]
+}

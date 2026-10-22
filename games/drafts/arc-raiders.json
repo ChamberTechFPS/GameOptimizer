@@ -1,0 +1,21 @@
+{
+  "slug": "arc-raiders",
+  "name": "ARC Raiders",
+  "tile": "AR",
+  "launcher": "steam",
+  "find": {
+    "steam": 1808500,
+    "epic": "ARC Raiders",
+    "paths": [
+      "{localappdata}/PioneerGame"
+    ]
+  },
+  "process": [],
+  "files": [
+    {
+      "path": "{localappdata}/PioneerGame/Saved/Config/WindowsClient/GameUserSettings.ini",
+      "format": "ini",
+      "settings": []
+    }
+  ]
+}

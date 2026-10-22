@@ -1,0 +1,24 @@
+{
+  "slug": "apex-legends",
+  "name": "Apex Legends",
+  "tile": "AP",
+  "launcher": "steam",
+  "find": {
+    "steam": 1172470,
+    "uninstall": "Apex Legends",
+    "paths": [
+      "{savedgames}/Respawn/Apex"
+    ]
+  },
+  "process": [
+    "r5apex.exe",
+    "r5apex_dx12.exe"
+  ],
+  "files": [
+    {
+      "path": "{savedgames}/Respawn/Apex/local/videoconfig.txt",
+      "format": "kv",
+      "settings": []
+    }
+  ]
+}

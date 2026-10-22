@@ -1,0 +1,24 @@
+{
+  "slug": "valorant",
+  "name": "Valorant",
+  "tile": "VA",
+  "launcher": "riot",
+  "find": { "uninstall": "VALORANT", "paths": ["{localappdata}/VALORANT"] },
+  "process": ["VALORANT-Win64-Shipping.exe"],
+  "manual": [
+    { "label": "Display mode", "value": "Fullscreen", "why": "Exclusive fullscreen has the lowest input latency." },
+    { "label": "Multithreaded rendering", "value": "On", "why": "Lets Valorant spread its work across your CPU cores." },
+    { "label": "Material quality", "value": "Low", "why": "Surface detail you don't need to spot anyone." },
+    { "label": "Texture quality", "value": "Low", "why": "Frees video memory. Sharper walls show you nothing new." },
+    { "label": "Detail quality", "value": "Low", "why": "Removes small map clutter." },
+    { "label": "UI quality", "value": "Low", "why": "Same information, less to draw." },
+    { "label": "Vignette", "value": "Off", "why": "Darkens the edges of your screen." },
+    { "label": "V-Sync", "value": "Off", "why": "V-Sync holds frames back, which adds input lag." },
+    { "label": "Anti-aliasing", "value": "MSAA 2x", "why": "Smooths edges without blurring heads." },
+    { "label": "Improve clarity", "value": "Off", "why": "Adds processing you don't need." },
+    { "label": "Bloom", "value": "Off", "why": "Glow can hide enemies near bright lights." },
+    { "label": "Distortion", "value": "Off", "why": "Warps the image around abilities." },
+    { "label": "Cast shadows", "value": "Off", "why": "Only affects first-person shadows." },
+    { "label": "NVIDIA Reflex Low Latency", "value": "On + Boost", "why": "Cuts the delay between your click and the shot on NVIDIA cards." }
+  ]
+}

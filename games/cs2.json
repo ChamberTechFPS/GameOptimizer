@@ -1,0 +1,24 @@
+{
+  "slug": "cs2",
+  "name": "Counter-Strike 2",
+  "tile": "CS",
+  "launcher": "steam",
+  "find": { "steam": 730 },
+  "process": ["cs2.exe"],
+  "files": [
+    {
+      "path": "{steamuserdata}/730/local/cfg/cs2_video.txt",
+      "format": "kv",
+      "settings": [
+        { "key": "setting.r_player_visibility_mode", "value": "1", "label": "Boost player contrast", "values": { "0": "Disabled", "1": "Enabled" }, "why": "Makes player models stand out against the map." },
+        { "key": "setting.videocfg_shadow_quality", "value": "2", "label": "Global shadow quality", "values": { "0": "Low", "1": "Medium", "2": "High", "3": "Very high" }, "why": "Kept high on purpose: an enemy's shadow can show before the enemy does." },
+        { "key": "setting.shaderquality", "value": "0", "label": "Shader detail", "values": { "0": "Low", "1": "High" }, "why": "Lighting polish you don't need to spot anyone." },
+        { "key": "setting.videocfg_particle_detail", "value": "0", "label": "Particle detail", "values": { "0": "Low", "1": "Medium", "2": "High", "3": "Very high" }, "why": "Less smoke, fire, and spark clutter in fights." },
+        { "key": "setting.videocfg_ao_detail", "value": "0", "label": "Ambient occlusion", "values": { "0": "Disabled", "1": "Medium", "2": "High" }, "why": "Soft contact shadows that cost frames and show you nothing." },
+        { "key": "setting.videocfg_fsr_detail", "value": "0", "label": "FidelityFX Super Resolution", "values": { "0": "Disabled" }, "why": "Upscaling softens distant players." },
+        { "key": "setting.mat_vsync", "value": "0", "label": "V-Sync", "values": { "0": "Disabled", "1": "Enabled" }, "why": "V-Sync holds frames back, which adds input lag." },
+        { "key": "setting.r_low_latency", "value": "2", "label": "NVIDIA Reflex", "values": { "0": "Disabled", "1": "Enabled", "2": "Enabled + boost" }, "why": "Cuts the delay between your click and the shot on NVIDIA cards. Other cards ignore it." }
+      ]
+    }
+  ]
+}

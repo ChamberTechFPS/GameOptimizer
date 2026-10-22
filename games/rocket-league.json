@@ -1,0 +1,22 @@
+{
+  "slug": "rocket-league",
+  "name": "Rocket League",
+  "tile": "RL",
+  "launcher": "epic",
+  "find": { "steam": 252950, "epic": "Rocket League", "paths": ["{documents}/My Games/Rocket League"] },
+  "process": ["RocketLeague.exe"],
+  "files": [
+    {
+      "path": "{documents}/My Games/Rocket League/TAGame/Config/TASystemSettings.ini",
+      "format": "ini",
+      "settings": [
+        { "section": "SystemSettings", "key": "DynamicShadows", "value": "False", "label": "Dynamic shadows", "values": { "False": "Off", "True": "On" }, "why": "Moving shadows that tell you nothing about the ball." },
+        { "section": "SystemSettings", "key": "MotionBlur", "value": "False", "label": "Motion blur", "values": { "False": "Off", "True": "On" }, "why": "Blur smears the ball during fast plays." },
+        { "section": "SystemSettings", "key": "DepthOfField", "value": "False", "label": "Depth of field", "values": { "False": "Off", "True": "On" }, "why": "Blurs the far end of the field." },
+        { "section": "SystemSettings", "key": "AmbientOcclusion", "value": "False", "label": "Ambient occlusion", "values": { "False": "Off", "True": "On" }, "why": "Soft contact shadows that cost frames." },
+        { "section": "SystemSettings", "key": "Bloom", "value": "False", "label": "Bloom", "values": { "False": "Off", "True": "On" }, "why": "Glow from boosts and goal explosions can hide the ball." },
+        { "section": "SystemSettings", "key": "LensFlares", "value": "False", "label": "Lens flares", "values": { "False": "Off", "True": "On" }, "why": "Pure decoration over the pitch." }
+      ]
+    }
+  ]
+}

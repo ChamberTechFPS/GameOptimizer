@@ -1,0 +1,23 @@
+{
+  "slug": "overwatch-2",
+  "name": "Overwatch 2",
+  "tile": "OW",
+  "launcher": "battlenet",
+  "find": {
+    "steam": 2357570,
+    "uninstall": "Overwatch",
+    "paths": [
+      "{documents}/Overwatch/Settings"
+    ]
+  },
+  "process": [
+    "Overwatch.exe"
+  ],
+  "files": [
+    {
+      "path": "{documents}/Overwatch/Settings/Settings_v0.ini",
+      "format": "ini",
+      "settings": []
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "slug": "wardogs",
+  "name": "WARDOGS",
+  "tile": "WD",
+  "launcher": "steam",
+  "find": {
+    "steam": 1867240,
+    "paths": [
+      "{localappdata}/Wardogs"
+    ]
+  },
+  "process": [],
+  "files": [
+    {
+      "path": "{localappdata}/Wardogs/Saved/Config/WindowsClient/GameUserSettings.ini",
+      "format": "ini",
+      "settings": []
+    }
+  ]
+}

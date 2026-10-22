@@ -1,0 +1,19 @@
+{
+  "slug": "deadlock",
+  "name": "Deadlock",
+  "tile": "DL",
+  "launcher": "steam",
+  "find": {
+    "steam": 1422450
+  },
+  "process": [
+    "deadlock.exe"
+  ],
+  "files": [
+    {
+      "path": "{install}/game/citadel/cfg/video.txt",
+      "format": "kv",
+      "settings": []
+    }
+  ]
+}

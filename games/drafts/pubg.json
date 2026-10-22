@@ -1,0 +1,22 @@
+{
+  "slug": "pubg",
+  "name": "PUBG: Battlegrounds",
+  "tile": "PG",
+  "launcher": "steam",
+  "find": {
+    "steam": 578080,
+    "paths": [
+      "{localappdata}/TslGame"
+    ]
+  },
+  "process": [
+    "TslGame.exe"
+  ],
+  "files": [
+    {
+      "path": "{localappdata}/TslGame/Saved/Config/WindowsNoEditor/GameUserSettings.ini",
+      "format": "ini",
+      "settings": []
+    }
+  ]
+}

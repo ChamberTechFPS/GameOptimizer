@@ -1,0 +1,13 @@
+{
+  "slug": "league-of-legends",
+  "name": "League of Legends",
+  "tile": "LOL",
+  "launcher": "riot",
+  "find": {
+    "uninstall": "League of Legends"
+  },
+  "process": [
+    "League of Legends.exe"
+  ],
+  "manual": []
+}
