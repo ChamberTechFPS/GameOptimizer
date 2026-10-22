@@ -1,0 +1,23 @@
+{
+  "slug": "rainbow-six-siege",
+  "name": "Rainbow Six Siege",
+  "tile": "R6",
+  "launcher": "ubisoft",
+  "find": {
+    "steam": 359550,
+    "paths": [
+      "{documents}/My Games/Rainbow Six - Siege"
+    ]
+  },
+  "process": [
+    "RainbowSix.exe",
+    "RainbowSix_Vulkan.exe"
+  ],
+  "files": [
+    {
+      "path": "{documents}/My Games/Rainbow Six - Siege/*/GameSettings.ini",
+      "format": "ini",
+      "settings": []
+    }
+  ]
+}

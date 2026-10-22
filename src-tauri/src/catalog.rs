@@ -225,17 +225,21 @@ impl Catalog {
 }
 
 /// `{token}/clean/relative/segments`: no drive letters, no `..`, no separators inside a segment.
+/// A game file may put one `*` folder between them, e.g. for a folder per account.
 pub fn check_path(path: &str, is_file: bool) -> Result<(), String> {
     let (token, rest) = split_token(path).ok_or_else(|| format!("path must start with an allowed {{token}}: {path}"))?;
     if !TOKENS.contains(&token) {
         return Err(format!("unknown path token {{{token}}}"));
     }
     let segments: Vec<&str> = rest.split('/').collect();
-    for seg in &segments {
-        let ok = seg.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
-            && seg.chars().all(|c| c.is_ascii_alphanumeric() || " ._()-".contains(c))
-            && !seg.ends_with(['.', ' ']);
-        if !ok {
+    let wild: Vec<usize> = (0..segments.len()).filter(|&i| segments[i] == "*").collect();
+    match wild[..] {
+        [] => {}
+        [i] if is_file && i > 0 && i + 1 < segments.len() => {}
+        _ => return Err(format!("a * may only stand for one folder inside a game file's path: {path}")),
+    }
+    for seg in segments.iter().filter(|s| **s != "*") {
+        if !is_segment(seg) {
             return Err(format!("unsafe path segment {seg:?} in {path}"));
         }
     }
@@ -266,6 +270,28 @@ pub fn expand(path: &str, roots: &HashMap<&str, PathBuf>) -> Result<PathBuf, Str
         out.push(seg);
     }
     Ok(out)
+}
+
+/// Every copy of a game file. A `*` folder matches each folder there that holds the file;
+/// a plain path comes back as is, even before the file exists.
+pub fn expand_all(path: &str, roots: &HashMap<&str, PathBuf>) -> Result<Vec<PathBuf>, String> {
+    check_path(path, true)?;
+    let Some((head, tail)) = path.split_once("/*/") else { return Ok(vec![expand(path, roots)?]) };
+    let Ok(entries) = std::fs::read_dir(expand(head, roots)?) else { return Ok(Vec::new()) };
+    let mut found: Vec<PathBuf> = entries
+        .flatten()
+        .filter(|e| e.file_name().to_str().is_some_and(is_segment)) // same rules as a written segment
+        .map(|e| tail.split('/').fold(e.path(), |p, seg| p.join(seg)))
+        .filter(|p| p.is_file())
+        .collect();
+    found.sort();
+    Ok(found)
+}
+
+fn is_segment(seg: &str) -> bool {
+    seg.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
+        && seg.chars().all(|c| c.is_ascii_alphanumeric() || " ._()-".contains(c))
+        && !seg.ends_with(['.', ' '])
 }
 
 fn is_slug(s: &str) -> bool {
@@ -349,6 +375,39 @@ mod tests {
         ] {
             assert!(check_path(bad, true).is_err(), "{bad} should be rejected");
         }
+    }
+
+    #[test]
+    fn one_wildcard_folder_inside_a_file_path() {
+        assert!(check_path("{documents}/My Games/Rainbow Six - Siege/*/GameSettings.ini", true).is_ok());
+        for bad in [
+            "{documents}/*/GameSettings.ini",   // every folder in Documents
+            "{documents}/My Games/*",           // the file itself
+            "{documents}/My Games/*/a/*/x.ini", // more than one
+            "{documents}/My Games/Siege*/x.ini",
+        ] {
+            assert!(check_path(bad, true).is_err(), "{bad} should be rejected");
+        }
+        assert!(check_path("{documents}/My Games/*/Siege", false).is_err(), "only game files can use one");
+    }
+
+    #[test]
+    fn expand_all_finds_every_accounts_copy() {
+        let dir = std::env::temp_dir().join(format!("chamber-catalog-wild-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        for account in ["b-account", "a-account", "no-file-yet", ".hidden"] {
+            std::fs::create_dir_all(dir.join("Siege").join(account)).unwrap();
+        }
+        for account in ["b-account", "a-account", ".hidden"] {
+            std::fs::write(dir.join("Siege").join(account).join("GameSettings.ini"), "").unwrap();
+        }
+        let roots = HashMap::from([("documents", dir.clone())]);
+        let found = expand_all("{documents}/Siege/*/GameSettings.ini", &roots).unwrap();
+        assert_eq!(found, [dir.join("Siege/a-account/GameSettings.ini"), dir.join("Siege/b-account/GameSettings.ini")]);
+        assert!(expand_all("{documents}/Gone/*/GameSettings.ini", &roots).unwrap().is_empty());
+        assert_eq!(expand_all("{documents}/Siege/x.ini", &roots).unwrap(), [dir.join("Siege/x.ini")], "a plain path, even before it exists");
+        assert!(expand("{documents}/Siege/*/GameSettings.ini", &roots).is_err(), "a single path never holds a *");
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

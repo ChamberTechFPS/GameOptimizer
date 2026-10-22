@@ -185,15 +185,23 @@ impl Engine {
         let mut rows = Vec::new();
         let mut missing_file = false;
         for f in &g.files {
-            let text = catalog::expand(&f.path, &roots)
-                .ok()
-                .and_then(|p| fs::read(p).ok())
-                .and_then(|b| patch::decode(&b).ok())
-                .map(|(_, t)| t);
-            missing_file |= text.is_none();
+            let texts: Vec<String> = catalog::expand_all(&f.path, &roots)
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|p| patch::decode(&fs::read(p).ok()?).ok())
+                .map(|(_, t)| t)
+                .collect();
+            missing_file |= texts.is_empty();
             for s in &f.settings {
                 let want = catalog::fill(&s.value, &pc.vars);
-                let now = text.as_deref().and_then(|t| get(f.format, t, s));
+                // With a copy per account, show the first copy that still differs.
+                let nows: Vec<Option<String>> = texts.iter().map(|t| get(f.format, t, s)).collect();
+                let now = nows
+                    .iter()
+                    .find(|n| !n.as_deref().is_some_and(|v| patch::same_value(v, &want)))
+                    .or(nows.first())
+                    .cloned()
+                    .flatten();
                 rows.push(Row {
                     label: s.label.clone(),
                     matched: now.as_deref().is_some_and(|n| patch::same_value(n, &want)),
@@ -250,13 +258,21 @@ impl Engine {
             .locate(g, Some(gs), pc)
             .ok_or_else(|| format!("{} isn't installed here. Set its folder in Library.", g.name))?;
         let roots = roots(pc, Some(&location));
+        let mut targets = Vec::new();
+        for f in &g.files {
+            let paths = catalog::expand_all(&f.path, &roots)?;
+            if paths.is_empty() {
+                return Err(launch_once(g));
+            }
+            targets.extend(paths.into_iter().map(|p| (f, p)));
+        }
         let previous = gs.applied.take();
         let stamp = now();
         let mut files = Vec::new();
         let mut changed = 0;
         let mut result = Ok(());
-        for f in &g.files {
-            match self.apply_file(g, f, &roots, pc, previous.as_ref(), stamp) {
+        for (f, path) in targets {
+            match self.apply_file(g, f, path, pc, previous.as_ref(), stamp) {
                 Ok((record, n)) => {
                     files.push(record);
                     changed += n;
@@ -283,14 +299,12 @@ impl Engine {
         &self,
         g: &Game,
         f: &FileTarget,
-        roots: &HashMap<&'static str, PathBuf>,
+        path: PathBuf,
         pc: &Pc,
         previous: Option<&Applied>,
         stamp: u64,
     ) -> Result<(AppliedFile, usize), String> {
-        let path = catalog::expand(&f.path, roots)?;
-        let bytes = fs::read(&path)
-            .map_err(|_| format!("Launch {} once so it creates its settings file, then try again.", g.name))?;
+        let bytes = fs::read(&path).map_err(|_| launch_once(g))?;
         let (encoding, text) = patch::decode(&bytes).map_err(|e| format!("{} {e}.", file_name(&path)))?;
         let prev = previous.and_then(|a| a.files.iter().find(|x| x.path == path));
 
@@ -315,7 +329,14 @@ impl Engine {
             None => {
                 let dir = self.data.join("backups").join(&g.slug).join(stamp.to_string());
                 fs::create_dir_all(&dir).map_err(io)?;
-                let b = dir.join(file_name(&path));
+                // Copies that share a name (one per account) each get their own backup.
+                let name = file_name(&path);
+                let mut b = dir.join(&name);
+                let mut n = 1;
+                while b.exists() {
+                    n += 1;
+                    b = dir.join(format!("{n}-{name}"));
+                }
                 fs::write(&b, &bytes).map_err(|e| format!("Couldn't back up {}, so nothing was changed: {e}", file_name(&path)))?;
                 b
             }
@@ -402,7 +423,7 @@ impl Engine {
         let roots = roots(pc, location.as_deref());
         g.files
             .iter()
-            .filter_map(|f| catalog::expand(&f.path, &roots).ok()?.parent().map(Path::to_path_buf))
+            .filter_map(|f| catalog::expand_all(&f.path, &roots).ok()?.first()?.parent().map(Path::to_path_buf))
             .find(|p| p.is_dir())
             .or(location.filter(|l| l.is_dir()))
             .ok_or_else(|| format!("Couldn't find {}'s settings folder.", g.name))
@@ -463,6 +484,10 @@ fn write_file(path: &Path, bytes: &[u8], read_only: bool) -> Result<(), String> 
         patch::set_read_only(path, true).map_err(io)?;
     }
     Ok(())
+}
+
+fn launch_once(g: &Game) -> String {
+    format!("Launch {} once so it creates its settings file, then try again.", g.name)
 }
 
 fn file_name(path: &Path) -> String {
@@ -629,6 +654,40 @@ mod tests {
         assert!(fx.engine.set_hidden(&fx.cat, "not-a-game", true).is_err());
         fx.engine.clear_folder(&fx.cat, "test-game").unwrap();
         assert_eq!(fx.engine.scan(&fx.cat, &fx.pc).unwrap()[0].folder, None);
+    }
+
+    #[test]
+    fn a_wildcard_folder_covers_every_account() {
+        let mut fx = fixture("wildcard");
+        let siege = fx.root.join("local/Siege");
+        let (a, b) = (siege.join("1111/GameSettings.ini"), siege.join("2222/GameSettings.ini"));
+        fs::create_dir_all(a.parent().unwrap()).unwrap();
+        fs::create_dir_all(b.parent().unwrap()).unwrap();
+        fx.cat.games[0].files = vec![serde_json::from_value(serde_json::json!({
+            "path": "{localappdata}/Siege/*/GameSettings.ini", "format": "ini",
+            "settings": [{ "section": "DISPLAY", "key": "VSync", "value": "0", "label": "V-Sync", "why": "w" }]
+        }))
+        .unwrap()];
+        fx.cat.validate().unwrap();
+        assert_eq!(status(&fx).0, "launch-once", "no account has played yet");
+        assert!(fx.engine.apply(&fx.cat, &fx.pc, "test-game").unwrap_err().contains("Launch Test Game once"));
+
+        fs::write(&a, "[DISPLAY]\r\nVSync=1\r\n").unwrap();
+        fs::write(&b, "[DISPLAY]\nVSync=0\nFPS=60\n").unwrap();
+        assert_eq!(status(&fx), ("not-optimized", 1), "one account still differs");
+        assert_eq!(fx.engine.apply(&fx.cat, &fx.pc, "test-game").unwrap(), 1);
+        assert_eq!(fs::read_to_string(&a).unwrap(), "[DISPLAY]\r\nVSync=0\r\n");
+        assert_eq!(status(&fx), ("optimized", 0));
+        let state = fx.engine.load_state().unwrap();
+        let files = &state.games["test-game"].applied.as_ref().unwrap().files;
+        assert_eq!(files.len(), 2, "each copy is recorded for revert");
+        assert_ne!(files[0].backup, files[1].backup, "same file name, separate backups");
+
+        fs::write(&b, "[DISPLAY]\nVSync=1\nFPS=60\n").unwrap();
+        assert_eq!(status(&fx), ("changed", 1));
+        fx.engine.revert(&fx.cat, &fx.pc, "test-game").unwrap();
+        assert_eq!(fs::read_to_string(&a).unwrap(), "[DISPLAY]\r\nVSync=1\r\n");
+        assert_eq!(fs::read_to_string(&b).unwrap(), "[DISPLAY]\nVSync=0\nFPS=60\n", "the first apply's value comes back");
     }
 
     #[test]
