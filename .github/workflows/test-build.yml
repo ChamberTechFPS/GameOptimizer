@@ -1,0 +1,26 @@
+name: Test build
+
+# Run from the Actions tab (or `gh workflow run test-build.yml`) to get an installer to try on a
+# real PC. Nothing is published: the installer is a private download on the run's page.
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build the installer
+        run: npx --yes @tauri-apps/cli@2 build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chamber-game-optimizer-setup
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 14
