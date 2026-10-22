@@ -276,6 +276,27 @@ pub fn convar_remove(text: &str, key: &str) -> String {
     line_remove(text, key, convar_parse)
 }
 
+// ---------- space-separated (Battlefield's PROFSAVE_profile: `GstRender.Dx12Enabled 1`) ----------
+
+/// The key on a `Key value` line, with the byte range of everything after the first space.
+fn spaced_parse(line: &str) -> Option<(&str, Range<usize>)> {
+    let body = split_eol(line).0;
+    let (key, _) = body.split_once(' ')?;
+    Some((key, key.len() + 1..body.len()))
+}
+
+pub fn spaced_get(text: &str, key: &str) -> Option<String> {
+    line_get(text, key, spaced_parse)
+}
+
+pub fn spaced_set(text: &str, key: &str, value: &str) -> String {
+    line_set(text, key, value, spaced_parse).unwrap_or_else(|| append(text, format!("{key} {value}")))
+}
+
+pub fn spaced_remove(text: &str, key: &str) -> String {
+    line_remove(text, key, spaced_parse)
+}
+
 // ---------- files ----------
 
 /// Write through a temp file and rename, so a crash never leaves a half-written config.
@@ -403,9 +424,25 @@ mod tests {
         assert_eq!(convar_remove(&added, "graphics.lodbias"), RUST);
     }
 
+    // Lines from a real Battlefield 6 PROFSAVE_profile. The last value is made up, to carry spaces and non-ASCII text.
+    const BF6: &str = "GstAudio.VoipOutputDevice \nGstAudio.Volume_VO-InWorld 1.000000\nGstRender.FutureFrameRendering 0\nGstAudio.VoipInputDevice Micrófono (USB)\n";
+
+    #[test]
+    fn spaced_set_get_and_insert() {
+        assert_eq!(spaced_get(BF6, "GstRender.FutureFrameRendering").as_deref(), Some("0"));
+        assert_eq!(spaced_get(BF6, "GstAudio.VoipOutputDevice").as_deref(), Some(""), "an empty value is still set");
+        assert_eq!(spaced_get(BF6, "GstAudio.VoipInputDevice").as_deref(), Some("Micrófono (USB)"), "everything after the first space");
+        let out = spaced_set(BF6, "GstRender.FutureFrameRendering", "1");
+        assert_eq!(out, BF6.replace("FutureFrameRendering 0", "FutureFrameRendering 1"));
+        let crlf = BF6.replace('\n', "\r\n");
+        let added = spaced_set(&crlf, "GstRender.WeaponDOF", "0");
+        assert!(added.ends_with("(USB)\r\nGstRender.WeaponDOF 0\r\n"), "new lines go last, in the file's line endings");
+        assert_eq!(spaced_remove(&added, "GstRender.WeaponDOF"), crlf);
+    }
+
     #[test]
     fn encodings_round_trip_byte_for_byte() {
-        for text in [UE, VIDEO, COD, RUST] {
+        for text in [UE, VIDEO, COD, RUST, BF6] {
             for enc in [Encoding::Utf8, Encoding::Utf8Bom, Encoding::Utf16Le] {
                 let bytes = encode(enc, text);
                 let (found, decoded) = decode(&bytes).unwrap();

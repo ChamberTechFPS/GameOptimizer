@@ -1,0 +1,22 @@
+{
+  "slug": "battlefield-6",
+  "name": "Battlefield 6",
+  "tile": "BF6",
+  "launcher": "ea",
+  "find": {
+    "steam": 2807960,
+    "paths": [
+      "{documents}/Battlefield 6/settings"
+    ]
+  },
+  "process": [
+    "bf6.exe"
+  ],
+  "files": [
+    {
+      "path": "{documents}/Battlefield 6/settings/*/PROFSAVE_profile",
+      "format": "spaced",
+      "settings": []
+    }
+  ]
+}

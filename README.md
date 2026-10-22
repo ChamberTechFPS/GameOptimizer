@@ -33,7 +33,7 @@ Each game shows my before and after once I've benchmarked it: average FPS and 1%
 - **Config files only.** These are the same files the game's own menu writes. Nothing is injected or left running, and the app never asks for admin rights.
 - **Menu settings only.** Every value is one the game's settings menu already offers. No hidden tweaks.
 - **Signed configs.** Config updates are signed with a key that never touches GitHub, so a hacked repo or account can't push configs to your PC. The app refuses anything unsigned or older than what it already has.
-- **Locked to config files.** A config can only point at `.ini`, `.cfg`, `.vcfg`, `.txt`, `.txt0`, or `.txt1` files under your user folders or a game's install folder. System paths, `..` tricks, and programs are rejected before anything is read.
+- **Locked to config files.** A config can only point at settings files (`.ini`, `.cfg`, `.vcfg`, `.txt`, `.txt0`, `.txt1`, and Battlefield's `PROFSAVE_profile`) under your user folders or a game's install folder. System paths, `..` tricks, and programs are rejected before anything is read.
 - **Hands off running games.** The app won't write while a game is running.
 - **Backups first.** The first change to any file copies the original to `%LOCALAPPDATA%\ChamberTech\GameOptimizer\backups`.
 - **No telemetry.**

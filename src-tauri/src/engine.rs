@@ -445,6 +445,7 @@ fn get(format: Format, text: &str, s: &Setting) -> Option<String> {
         Format::Kv => patch::kv_get(text, &s.key),
         Format::Cod => patch::cod_get(text, &s.key),
         Format::Convar => patch::convar_get(text, &s.key),
+        Format::Spaced => patch::spaced_get(text, &s.key),
     }
 }
 
@@ -454,6 +455,7 @@ fn set(format: Format, text: &str, section: Option<&str>, key: &str, value: &str
         Format::Kv => patch::kv_set(text, key, value),
         Format::Cod => patch::cod_set(text, key, value),
         Format::Convar => Ok(patch::convar_set(text, key, value)),
+        Format::Spaced => Ok(patch::spaced_set(text, key, value)),
     }
 }
 
@@ -463,6 +465,7 @@ fn remove(format: Format, text: &str, section: Option<&str>, key: &str) -> Strin
         Format::Kv => patch::kv_remove(text, key),
         Format::Cod => patch::cod_remove(text, key),
         Format::Convar => patch::convar_remove(text, key),
+        Format::Spaced => patch::spaced_remove(text, key),
     }
 }
 

@@ -17,6 +17,8 @@ const MODULUS_HEX: &str = "cdb8a11eb62f5182fdc5707fcd873c78302beec9455d6095ba77c
 pub const TOKENS: [&str; 6] = ["localappdata", "appdata", "documents", "savedgames", "steamuserdata", "install"];
 const LAUNCHERS: [&str; 7] = ["steam", "epic", "riot", "battlenet", "ea", "ubisoft", "other"];
 const EXTENSIONS: [&str; 6] = ["ini", "txt", "cfg", "vcfg", "txt0", "txt1"];
+/// Settings files with no extension, allowed by exact name.
+const FILE_NAMES: [&str; 1] = ["PROFSAVE_profile"];
 const VARIABLES: [&str; 3] = ["{refresh}", "{width}", "{height}"];
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -67,6 +69,8 @@ pub enum Format {
     Cod,
     /// Console variables, one per line: `graphics.vsync "0"` (Rust).
     Convar,
+    /// `Key value` lines (Battlefield).
+    Spaced,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -247,7 +251,7 @@ pub fn check_path(path: &str, is_file: bool) -> Result<(), String> {
     }
     if is_file {
         let ext = segments.last().and_then(|s| s.rsplit_once('.')).map(|(_, e)| e.to_ascii_lowercase());
-        if !ext.is_some_and(|e| EXTENSIONS.contains(&e.as_str())) {
+        if !ext.is_some_and(|e| EXTENSIONS.contains(&e.as_str())) && !segments.last().is_some_and(|s| FILE_NAMES.contains(s)) {
             return Err(format!("not a config file type: {path}"));
         }
     }
@@ -326,7 +330,7 @@ fn is_value(s: &str, format: Format) -> bool {
         rest = rest.replace(v, "");
     }
     let fits = match format {
-        Format::Ini => true,
+        Format::Ini | Format::Spaced => true,
         Format::Kv | Format::Convar => !s.contains('"'),
         Format::Cod => !s.contains("//"),
     };
@@ -363,6 +367,7 @@ mod tests {
         assert!(check_path("{localappdata}/FortniteGame/Saved/GameUserSettings.ini", true).is_ok());
         assert!(check_path("{documents}/My Games/Rocket League (x)/a.ini", true).is_ok());
         assert!(check_path("{localappdata}/Activision/Call of Duty/players/s.1.0.cod26.txt0", true).is_ok());
+        assert!(check_path("{documents}/Battlefield 6/settings/*/PROFSAVE_profile", true).is_ok());
         for bad in [
             "C:/Windows/system.ini",
             "{localappdata}/../x.ini",
@@ -371,6 +376,7 @@ mod tests {
             "{temp}/x.ini",
             "{localappdata}/a\\b.ini",
             "{localappdata}/x.exe",
+            "{documents}/Battlefield 6/settings/steam/PROFSAVE",
             "{localappdata}/x.ini.",
             "{localappdata}//x.ini",
             "localappdata/x.ini",
