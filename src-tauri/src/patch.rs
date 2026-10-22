@@ -182,6 +182,14 @@ fn line_remove(text: &str, key: &str, parse: Parse) -> String {
     lines(text).into_iter().filter(|l| !parse(l).is_some_and(|(k, _)| k.eq_ignore_ascii_case(key))).collect()
 }
 
+/// Add a line at the end of the file.
+fn append(text: &str, content: String) -> String {
+    let mut all = lines(text);
+    let at = all.len();
+    push_line(&mut all, at, content, newline(text));
+    all.concat()
+}
+
 // ---------- Valve KeyValues (flat files like cs2_video.txt) ----------
 
 /// The quoted key on a `"key"  "value"` line, with the value's byte range.
@@ -244,6 +252,28 @@ pub fn cod_set(text: &str, key: &str, value: &str) -> Result<String, String> {
 
 pub fn cod_remove(text: &str, key: &str) -> String {
     line_remove(text, key, cod_parse)
+}
+
+// ---------- console variables (Rust's cfg/client.cfg: `graphics.vsync "0"`) ----------
+
+/// The key on a `name "value"` line, with the value's byte range inside the quotes.
+fn convar_parse(line: &str) -> Option<(&str, Range<usize>)> {
+    let (key, rest) = split_eol(line).0.split_once(' ')?;
+    let value = rest.strip_prefix('"')?.strip_suffix('"')?;
+    Some((key, key.len() + 2..key.len() + 2 + value.len()))
+}
+
+pub fn convar_get(text: &str, key: &str) -> Option<String> {
+    line_get(text, key, convar_parse)
+}
+
+/// A missing convar goes last: the game reads every line, then rewrites the file in its own order.
+pub fn convar_set(text: &str, key: &str, value: &str) -> String {
+    line_set(text, key, value, convar_parse).unwrap_or_else(|| append(text, format!("{key} \"{value}\"")))
+}
+
+pub fn convar_remove(text: &str, key: &str) -> String {
+    line_remove(text, key, convar_parse)
 }
 
 // ---------- files ----------
@@ -357,9 +387,25 @@ mod tests {
         assert_eq!(cod_remove(COD, "ShowBlood@0"), COD.replace("ShowBlood@0;57752;20945 = true\n", ""));
     }
 
+    // Lines from a real Rust client.cfg, in CRLF. The last value is made up, to carry non-ASCII text.
+    const RUST: &str = "audio.master \"1\"\r\nclient.cambone \"\"\r\nclient.camoffset \"(0.0, 1.0, 0.0)\"\r\ngraphics.vsync \"1\"\r\nglobal.language \"Español\"\r\n";
+
+    #[test]
+    fn convar_set_get_and_insert() {
+        assert_eq!(convar_get(RUST, "graphics.vsync").as_deref(), Some("1"));
+        assert_eq!(convar_get(RUST, "client.camoffset").as_deref(), Some("(0.0, 1.0, 0.0)"), "spaces inside the quotes");
+        assert_eq!(convar_get(RUST, "client.cambone").as_deref(), Some(""), "an empty value is still set");
+        assert_eq!(convar_get(RUST, "graphics"), None);
+        let out = convar_set(RUST, "graphics.vsync", "0");
+        assert_eq!(out, RUST.replace("graphics.vsync \"1\"", "graphics.vsync \"0\""));
+        let added = convar_set(RUST, "graphics.lodbias", "0.5");
+        assert!(added.ends_with("\r\ngraphics.lodbias \"0.5\"\r\n"), "new lines go last, in the file's line endings");
+        assert_eq!(convar_remove(&added, "graphics.lodbias"), RUST);
+    }
+
     #[test]
     fn encodings_round_trip_byte_for_byte() {
-        for text in [UE, VIDEO, COD] {
+        for text in [UE, VIDEO, COD, RUST] {
             for enc in [Encoding::Utf8, Encoding::Utf8Bom, Encoding::Utf16Le] {
                 let bytes = encode(enc, text);
                 let (found, decoded) = decode(&bytes).unwrap();

@@ -32,7 +32,7 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | Rainbow Six Siege | #38 · 9.7K | – | #20 · 62,306 | draft |
 | Call of Duty: Warzone | #39 · 9.5K | – | (Call of Duty app) | draft (call-of-duty) |
 | PUBG: Battlegrounds | – | – | #3 · 287,432 | draft |
-| Rust | – | 6.8K | #10 · 112,054 | needs an engine addition |
+| Rust | – | 6.8K | #10 · 112,054 | draft |
 | Delta Force | – | – | #34 · 45,677 (peak 106,853) | draft |
 | Battlefield 6 | – | – | #42 · 42,306 | needs an engine addition |
 | THE FINALS | – | – | #63 · 24,523 | draft |
@@ -70,6 +70,7 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | the-finals | `%LOCALAPPDATA%\Discovery\...\WindowsClient\GameUserSettings.ini` | low (inferred from Unreal's layout) | Confirm the folder name first. |
 | call-of-duty | `%LOCALAPPDATA%\Activision\Call of Duty\players\s.1.0.cod26.txt0` (cod) | medium (a third-party MW4 script and real Black Ops 6 files) | One draft covers MW4 and Warzone, since both run in the Call of Duty app. I couldn't confirm that Warzone reads this same file. This is where Battle.net keeps it. Steam keeps it in `Documents\Call of Duty\players`, and a game file can point at only one folder for now. If `s.1.0.cod26.txt1` sits beside it, add it as a second file with the same settings. Confirm `cod26-cod.exe` in Task Manager while MW4 runs. |
 | rainbow-six-siege | `Documents\My Games\Rainbow Six - Siege\<account id>\GameSettings.ini` (ini) | high (Ubisoft support's forum replies) | The `*` folder covers every account that has played on this PC. Confirm `RainbowSix.exe` in Task Manager, since Siege X may have renamed it. |
+| rust | `{install}/cfg/client.cfg` (convar) | high (real client.cfg files) | The file holds every console variable, not just menu ones. Use only what the options menu sets. Rust writes this file when it quits. |
 
 ## Finishing a draft
 
@@ -92,6 +93,7 @@ Each file in `files` names its `format`. Write keys and values exactly as the fi
 | `ini` | `Key=Value` under `[Section]` | the key, plus `section` | |
 | `kv` | `"key"  "value"` (Valve) | the key | No quotes in values. |
 | `cod` | `Name@0;id;id = value // note` (Call of Duty) | `Name@0`: the name and its variant | The ids and notes stay as the game wrote them. Chamber can't add a setting the file lacks. No `//` in values. |
+| `convar` | `name "value"` (Rust) | the name | No quotes in values. A missing one is added at the end. |
 
 One folder per account? Put `*` in its place: `{documents}/My Games/Rainbow Six - Siege/*/GameSettings.ini`. Chamber edits every copy it finds and backs up each one. A path gets one `*` at most, and never as its first folder or as the file.
 
@@ -101,6 +103,5 @@ Each needs one small, tested addition to the engine. Add it when you're ready to
 
 | Game | What's missing |
 |---|---|
-| Rust | `cfg/client.cfg` uses `graphics.setting "value"` lines. Needs a convar format. |
 | Battlefield 6 | `PROFSAVE_profile` uses `GstRender.Setting value` lines. Needs a space-separated format. |
 | Escape from Tarkov | `Graphics.ini` is JSON inside. Needs a JSON format. |

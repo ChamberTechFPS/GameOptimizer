@@ -65,6 +65,8 @@ pub enum Format {
     Kv,
     /// Call of Duty's settings file: `Name@0;id;id = value // note` lines.
     Cod,
+    /// Console variables, one per line: `graphics.vsync "0"` (Rust).
+    Convar,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -316,8 +318,8 @@ fn is_key(s: &str, format: Format) -> bool {
 }
 
 /// Values are written into files: no line breaks or unknown {variables}, and nothing that ends
-/// the value early: a quote in Valve files, a `//` note in Call of Duty files. INI values may
-/// carry quotes (Overwatch uses them).
+/// the value early: a quote in Valve and convar files, a `//` note in Call of Duty files. INI
+/// values may carry quotes (Overwatch uses them).
 fn is_value(s: &str, format: Format) -> bool {
     let mut rest = s.to_string();
     for v in VARIABLES {
@@ -325,7 +327,7 @@ fn is_value(s: &str, format: Format) -> bool {
     }
     let fits = match format {
         Format::Ini => true,
-        Format::Kv => !s.contains('"'),
+        Format::Kv | Format::Convar => !s.contains('"'),
         Format::Cod => !s.contains("//"),
     };
     fits && !s.chars().any(char::is_control) && !rest.contains(['{', '}'])
@@ -429,6 +431,8 @@ mod tests {
         assert!(!is_value("{username}", Format::Ini));
         assert!(is_value("Enabled + boost", Format::Cod));
         assert!(!is_value("Off // On", Format::Cod), "a // note would cut a Call of Duty value short");
+        assert!(is_value("(0.0, 1.0, 0.0)", Format::Convar));
+        assert!(!is_value("1\" \"evil", Format::Convar), "a quote would end a convar value");
     }
 
     #[test]

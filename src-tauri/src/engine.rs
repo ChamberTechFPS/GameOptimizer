@@ -444,6 +444,7 @@ fn get(format: Format, text: &str, s: &Setting) -> Option<String> {
         Format::Ini => patch::ini_get(text, s.section.as_deref().unwrap_or_default(), &s.key),
         Format::Kv => patch::kv_get(text, &s.key),
         Format::Cod => patch::cod_get(text, &s.key),
+        Format::Convar => patch::convar_get(text, &s.key),
     }
 }
 
@@ -452,6 +453,7 @@ fn set(format: Format, text: &str, section: Option<&str>, key: &str, value: &str
         Format::Ini => Ok(patch::ini_set(text, section.unwrap_or_default(), key, value)),
         Format::Kv => patch::kv_set(text, key, value),
         Format::Cod => patch::cod_set(text, key, value),
+        Format::Convar => Ok(patch::convar_set(text, key, value)),
     }
 }
 
@@ -460,6 +462,7 @@ fn remove(format: Format, text: &str, section: Option<&str>, key: &str) -> Strin
         Format::Ini => patch::ini_remove(text, section.unwrap_or_default(), key),
         Format::Kv => patch::kv_remove(text, key),
         Format::Cod => patch::cod_remove(text, key),
+        Format::Convar => patch::convar_remove(text, key),
     }
 }
 

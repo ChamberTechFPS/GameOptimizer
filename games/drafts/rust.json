@@ -1,0 +1,19 @@
+{
+  "slug": "rust",
+  "name": "Rust",
+  "tile": "RU",
+  "launcher": "steam",
+  "find": {
+    "steam": 252490
+  },
+  "process": [
+    "RustClient.exe"
+  ],
+  "files": [
+    {
+      "path": "{install}/cfg/client.cfg",
+      "format": "convar",
+      "settings": []
+    }
+  ]
+}
