@@ -17,7 +17,8 @@ jobs:
         shell: bash
         run: |
           version=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+          # v1.0.0-beta.1 is a prerelease of 1.0.0
+          if [ "v$version" != "${GITHUB_REF_NAME%%-*}" ]; then
             echo "Tag $GITHUB_REF_NAME doesn't match tauri.conf.json version $version"
             exit 1
           fi
@@ -33,9 +34,13 @@ jobs:
       - name: Build the installer
         run: npx --yes @tauri-apps/cli@2 build
 
-      # A draft release: nothing reaches players until it's reviewed and published by hand.
-      - name: Draft release
+      # v1.2.3 -> a draft to review and publish by hand. v1.2.3-beta.1 -> a prerelease for testing,
+      # which GitHub never marks as latest, so the app's update check ignores it.
+      - name: Create the release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --draft --generate-notes --title "Chamber Game Optimizer $GITHUB_REF_NAME" src-tauri/target/release/bundle/nsis/*.exe
+        run: |
+          kind=--draft
+          [[ "$GITHUB_REF_NAME" == *-* ]] && kind=--prerelease
+          gh release create "$GITHUB_REF_NAME" $kind --generate-notes --title "Chamber Game Optimizer $GITHUB_REF_NAME" src-tauri/target/release/bundle/nsis/*.exe
