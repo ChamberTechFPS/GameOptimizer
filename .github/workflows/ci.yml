@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: catalog.json matches games/
+        run: node tools/build-catalog.mjs --check
+
+      - name: UI syntax
+        run: node --check ui/app.js
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Includes every game file's validation and the catalog signature check (CI=true makes it required).
+      - name: Engine tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Lint
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings

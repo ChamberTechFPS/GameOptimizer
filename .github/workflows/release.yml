@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches the app version
+        shell: bash
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match tauri.conf.json version $version"
+            exit 1
+          fi
+
+      - name: catalog.json matches games/
+        run: node tools/build-catalog.mjs --check
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Engine tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build the installer
+        run: npx --yes @tauri-apps/cli@2 build
+
+      # A draft release: nothing reaches players until it's reviewed and published by hand.
+      - name: Draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --draft --generate-notes --title "Chamber Game Optimizer $GITHUB_REF_NAME" src-tauri/target/release/bundle/nsis/*.exe
