@@ -297,6 +297,140 @@ pub fn spaced_remove(text: &str, key: &str) -> String {
     line_remove(text, key, spaced_parse)
 }
 
+// ---------- JSON (Escape from Tarkov's Graphics.ini), keys as dotted paths ----------
+// A value is found by its byte range and swapped in place, so nothing else gets reformatted.
+
+fn skip_ws(b: &[u8], mut i: usize) -> usize {
+    while b.get(i).is_some_and(u8::is_ascii_whitespace) {
+        i += 1;
+    }
+    i
+}
+
+/// Just past the closing quote of the string that starts at `i`.
+fn json_string_end(b: &[u8], i: usize) -> Option<usize> {
+    let mut j = i + 1;
+    loop {
+        match b.get(j)? {
+            b'\\' => j += 2,
+            b'"' => return Some(j + 1),
+            _ => j += 1,
+        }
+    }
+}
+
+/// Just past the end of the value that starts at `i`.
+fn json_value_end(b: &[u8], i: usize) -> Option<usize> {
+    match b.get(i)? {
+        b'"' => json_string_end(b, i),
+        b'{' | b'[' => {
+            let (mut depth, mut j) = (0, i);
+            loop {
+                match b.get(j)? {
+                    b'"' => j = json_string_end(b, j)? - 1,
+                    b'{' | b'[' => depth += 1,
+                    b'}' | b']' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            return Some(j + 1);
+                        }
+                    }
+                    _ => {}
+                }
+                j += 1;
+            }
+        }
+        _ => Some(b[i..].iter().position(|c| b",}] \t\r\n".contains(c)).map_or(b.len(), |n| i + n)),
+    }
+}
+
+/// The members of the object at `open`: (key, where its key starts, its value's range).
+fn json_members(text: &str, open: usize) -> Option<Vec<(&str, usize, Range<usize>)>> {
+    let b = text.as_bytes();
+    if b.get(open) != Some(&b'{') {
+        return None;
+    }
+    let mut out = Vec::new();
+    let mut i = skip_ws(b, open + 1);
+    if b.get(i) == Some(&b'}') {
+        return Some(out);
+    }
+    loop {
+        if b.get(i) != Some(&b'"') {
+            return None;
+        }
+        let key_end = json_string_end(b, i)?;
+        let colon = skip_ws(b, key_end);
+        if b.get(colon) != Some(&b':') {
+            return None;
+        }
+        let start = skip_ws(b, colon + 1);
+        let end = json_value_end(b, start)?;
+        out.push((&text[i + 1..key_end - 1], i, start..end));
+        i = skip_ws(b, end);
+        match b.get(i)? {
+            b',' => i = skip_ws(b, i + 1),
+            b'}' => return Some(out),
+            _ => return None,
+        }
+    }
+}
+
+/// Where the object holding the path's last part opens, and that last part.
+fn json_parent<'p>(text: &str, path: &'p str) -> Option<(usize, &'p str)> {
+    let mut parts: Vec<&str> = path.split('.').collect();
+    let leaf = parts.pop()?;
+    let mut open = skip_ws(text.as_bytes(), 0);
+    for part in parts {
+        open = json_members(text, open)?.into_iter().find(|(k, _, _)| k.eq_ignore_ascii_case(part))?.2.start;
+    }
+    Some((open, leaf))
+}
+
+/// The raw JSON at `path`: `false`, `144`, `"High"` (quotes included).
+pub fn json_get(text: &str, path: &str) -> Option<String> {
+    let (open, leaf) = json_parent(text, path)?;
+    let (_, _, value) = json_members(text, open)?.into_iter().find(|(k, _, _)| k.eq_ignore_ascii_case(leaf))?;
+    Some(text[value].to_string())
+}
+
+/// A missing key becomes the object's last member, indented like the one before it. A missing
+/// object is never invented.
+pub fn json_set(text: &str, path: &str, value: &str) -> Result<String, String> {
+    let missing = || format!("couldn't find where to add {path}");
+    let (open, leaf) = json_parent(text, path).ok_or_else(missing)?;
+    let members = json_members(text, open).ok_or_else(missing)?;
+    if let Some((_, _, old)) = members.iter().find(|(k, _, _)| k.eq_ignore_ascii_case(leaf)) {
+        return Ok(format!("{}{value}{}", &text[..old.start], &text[old.end..]));
+    }
+    let (at, member) = match members.last() {
+        Some((_, key_at, last)) => {
+            let indent = &text[text[..*key_at].trim_end().len()..*key_at];
+            (last.end, format!(",{indent}\"{leaf}\": {value}"))
+        }
+        None => (open + 1, format!("\"{leaf}\": {value}")),
+    };
+    Ok(format!("{}{member}{}", &text[..at], &text[at..]))
+}
+
+pub fn json_remove(text: &str, path: &str) -> String {
+    let cut = || {
+        let (open, leaf) = json_parent(text, path)?;
+        let members = json_members(text, open)?;
+        let i = members.iter().position(|(k, _, _)| k.eq_ignore_ascii_case(leaf))?;
+        // One comma goes with it: the one before, or the one after when it comes first.
+        Some(match (i.checked_sub(1), members.get(i + 1)) {
+            (Some(before), _) => members[before].2.end..members[i].2.end,
+            (None, Some(next)) => members[i].1..next.1,
+            (None, None) => members[i].1..members[i].2.end,
+        })
+    };
+    match cut() {
+        Some(r) => format!("{}{}", &text[..r.start], &text[r.end..]),
+        None => text.to_string(),
+    }
+}
+
 // ---------- files ----------
 
 /// Write through a temp file and rename, so a crash never leaves a half-written config.
@@ -440,9 +574,53 @@ mod tests {
         assert_eq!(spaced_remove(&added, "GstRender.WeaponDOF"), crlf);
     }
 
+    // Trimmed from a real Escape from Tarkov Graphics.ini (JSON, no newline at the end). "Monitor" is made up.
+    const EFT: &str = "{\n  \"Version\": 9,\n  \"Stored\": [\n    {\n      \"Index\": 0,\n      \"FullScreenResolution\": {\n        \"Width\": 2560,\n        \"Height\": 1440\n      }\n    }\n  ],\n  \"DisplaySettings\": {\n    \"Display\": 0,\n    \"FullScreenMode\": 1\n  },\n  \"GraphicsQuality\": null,\n  \"CloudsQuality\": \"Low\",\n  \"VSync\": false,\n  \"OverallVisibility\": 1000.0,\n  \"Monitor\": \"Écran \\\"principal\\\"\",\n  \"NVidiaReflex\": \"On\"\n}";
+
+    #[test]
+    fn json_reads_dotted_paths() {
+        assert_eq!(json_get(EFT, "VSync").as_deref(), Some("false"));
+        assert_eq!(json_get(EFT, "CloudsQuality").as_deref(), Some("\"Low\""), "raw JSON, quotes included");
+        assert_eq!(json_get(EFT, "DisplaySettings.FullScreenMode").as_deref(), Some("1"));
+        assert_eq!(json_get(EFT, "nvidiareflex").as_deref(), Some("\"On\""));
+        assert_eq!(json_get(EFT, "GraphicsQuality").as_deref(), Some("null"));
+        assert_eq!(json_get(EFT, "Monitor").as_deref(), Some("\"Écran \\\"principal\\\"\""), "an escaped quote doesn't end a string");
+        assert_eq!(json_get(EFT, "OverallVisibility").as_deref(), Some("1000.0"));
+        assert_eq!(json_get(EFT, "Index"), None, "only the path given, not a match deeper down");
+        assert_eq!(json_get(EFT, "DisplaySettings.Missing"), None);
+        assert_eq!(json_get(EFT, "VSync.Inner"), None, "false isn't an object");
+    }
+
+    #[test]
+    fn json_set_changes_only_that_value() {
+        assert_eq!(json_set(EFT, "VSync", "true").unwrap(), EFT.replace("\"VSync\": false", "\"VSync\": true"));
+        assert_eq!(json_set(EFT, "DisplaySettings.FullScreenMode", "0").unwrap(), EFT.replace("\"FullScreenMode\": 1", "\"FullScreenMode\": 0"));
+        assert_eq!(json_set(EFT, "CloudsQuality", "\"High\"").unwrap(), EFT.replace("\"Low\"", "\"High\""));
+    }
+
+    #[test]
+    fn json_set_then_remove_restores_the_original() {
+        let crlf = EFT.replace('\n', "\r\n");
+        let added = json_set(&crlf, "DisplaySettings.VSyncMode", "2").unwrap();
+        assert!(added.contains("\"FullScreenMode\": 1,\r\n    \"VSyncMode\": 2\r\n  },"), "indented like its neighbours");
+        assert_eq!(json_remove(&added, "DisplaySettings.VSyncMode"), crlf);
+        let top = json_set(EFT, "Sharpen", "0.2").unwrap();
+        assert!(top.ends_with("\"NVidiaReflex\": \"On\",\n  \"Sharpen\": 0.2\n}"));
+        assert_eq!(json_remove(&top, "Sharpen"), EFT);
+        assert_eq!(json_remove(&json_set("{}", "A", "1").unwrap(), "A"), "{}");
+        assert!(json_set(EFT, "Nope.Deeper", "1").is_err(), "a missing object is never invented");
+    }
+
+    #[test]
+    fn json_remove_takes_one_comma_along() {
+        // After the game rewrites the file, a key Chamber added can sit anywhere.
+        assert_eq!(json_remove("{\n  \"A\": 1,\n  \"B\": 2\n}", "A"), "{\n  \"B\": 2\n}");
+        assert_eq!(json_remove("{\n  \"A\": 1,\n  \"B\": 2,\n  \"C\": 3\n}", "B"), "{\n  \"A\": 1,\n  \"C\": 3\n}");
+    }
+
     #[test]
     fn encodings_round_trip_byte_for_byte() {
-        for text in [UE, VIDEO, COD, RUST, BF6] {
+        for text in [UE, VIDEO, COD, RUST, BF6, EFT] {
             for enc in [Encoding::Utf8, Encoding::Utf8Bom, Encoding::Utf16Le] {
                 let bytes = encode(enc, text);
                 let (found, decoded) = decode(&bytes).unwrap();

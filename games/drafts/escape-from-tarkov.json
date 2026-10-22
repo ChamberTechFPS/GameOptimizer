@@ -1,0 +1,22 @@
+{
+  "slug": "escape-from-tarkov",
+  "name": "Escape from Tarkov",
+  "tile": "EFT",
+  "launcher": "other",
+  "find": {
+    "steam": 3932890,
+    "paths": [
+      "{appdata}/Battlestate Games/Escape from Tarkov"
+    ]
+  },
+  "process": [
+    "EscapeFromTarkov.exe"
+  ],
+  "files": [
+    {
+      "path": "{appdata}/Battlestate Games/Escape from Tarkov/Settings/Graphics.ini",
+      "format": "json",
+      "settings": []
+    }
+  ]
+}

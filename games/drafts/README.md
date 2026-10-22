@@ -27,7 +27,7 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | WARDOGS | #18 · 24.5K | 5.0K | #7 · 170,247 | draft |
 | Marvel Rivals | #20 · 18.6K | – | #33 · 45,742 | draft |
 | Apex Legends | #23 · 15.8K | – | #16 · 79,959 | draft |
-| Escape from Tarkov | #31 · 10.6K | – | #71 · 21,374 | needs an engine addition |
+| Escape from Tarkov | #31 · 10.6K | – | #71 · 21,374 | draft |
 | Rocket League | #36 · 9.8K | – | #61 · 25,598 | shipped in v1 |
 | Rainbow Six Siege | #38 · 9.7K | – | #20 · 62,306 | draft |
 | Call of Duty: Warzone | #39 · 9.5K | – | (Call of Duty app) | draft (call-of-duty) |
@@ -72,6 +72,7 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | rainbow-six-siege | `Documents\My Games\Rainbow Six - Siege\<account id>\GameSettings.ini` (ini) | high (Ubisoft support's forum replies) | The `*` folder covers every account that has played on this PC. Confirm `RainbowSix.exe` in Task Manager, since Siege X may have renamed it. |
 | rust | `{install}/cfg/client.cfg` (convar) | high (real client.cfg files) | The file holds every console variable, not just menu ones. Use only what the options menu sets. Rust writes this file when it quits. |
 | battlefield-6 | `Documents\Battlefield 6\settings\<launcher>\PROFSAVE_profile` (spaced) | medium (guides and a settings tool; nothing official) | The `*` folder matches the launcher folder, like `steam` or `ea`. If your file sits straight in `settings`, take `*/` out of the path. Confirm `bf6.exe` in Task Manager. |
+| escape-from-tarkov | `%APPDATA%\Battlestate Games\Escape from Tarkov\Settings\Graphics.ini` (json) | high (real Graphics.ini files) | The file is JSON despite its name. Check that the Steam copy uses this same folder. |
 
 ## Finishing a draft
 
@@ -89,20 +90,13 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 
 Each file in `files` names its `format`. Write keys and values exactly as the file stores them.
 
-| Format | Lines it edits | `key` | Notes |
+| Format | What it edits | `key` | Notes |
 |---|---|---|---|
 | `ini` | `Key=Value` under `[Section]` | the key, plus `section` | |
 | `kv` | `"key"  "value"` (Valve) | the key | No quotes in values. |
 | `cod` | `Name@0;id;id = value // note` (Call of Duty) | `Name@0`: the name and its variant | The ids and notes stay as the game wrote them. Chamber can't add a setting the file lacks. No `//` in values. |
 | `convar` | `name "value"` (Rust) | the name | No quotes in values. A missing one is added at the end. |
 | `spaced` | `Key value` (Battlefield) | the key | The value is everything after the first space. A missing one is added at the end. |
+| `json` | one value in a JSON file (Tarkov) | a dotted path, like `DisplaySettings.FullScreenMode` | Values are raw JSON: `false`, `144`, or `"High"` with its quotes. Nothing else gets reformatted. A missing key is added to its object, but a missing object is never created. |
 
 One folder per account? Put `*` in its place: `{documents}/My Games/Rainbow Six - Siege/*/GameSettings.ini`. Chamber edits every copy it finds and backs up each one. A path gets one `*` at most, and never as its first folder or as the file.
-
-## Games that need an engine addition first
-
-Each needs one small, tested addition to the engine. Add it when you're ready to write that game's config.
-
-| Game | What's missing |
-|---|---|
-| Escape from Tarkov | `Graphics.ini` is JSON inside. Needs a JSON format. |

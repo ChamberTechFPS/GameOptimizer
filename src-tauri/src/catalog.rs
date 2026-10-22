@@ -71,6 +71,8 @@ pub enum Format {
     Convar,
     /// `Key value` lines (Battlefield).
     Spaced,
+    /// JSON, keyed by dotted path: `DisplaySettings.FullScreenMode` (Escape from Tarkov).
+    Json,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -333,6 +335,8 @@ fn is_value(s: &str, format: Format) -> bool {
         Format::Ini | Format::Spaced => true,
         Format::Kv | Format::Convar => !s.contains('"'),
         Format::Cod => !s.contains("//"),
+        // One JSON scalar: an object, an array, or `1, "x": 2` would add structure, not a value.
+        Format::Json => serde_json::from_str::<serde_json::Value>(&fill(s, &Vars::default())).is_ok_and(|v| !v.is_object() && !v.is_array()),
     };
     fits && !s.chars().any(char::is_control) && !rest.contains(['{', '}'])
 }
@@ -439,6 +443,12 @@ mod tests {
         assert!(!is_value("Off // On", Format::Cod), "a // note would cut a Call of Duty value short");
         assert!(is_value("(0.0, 1.0, 0.0)", Format::Convar));
         assert!(!is_value("1\" \"evil", Format::Convar), "a quote would end a convar value");
+        assert!(is_value("false", Format::Json));
+        assert!(is_value("\"TAA_High\"", Format::Json));
+        assert!(is_value("{refresh}", Format::Json));
+        assert!(!is_value("High", Format::Json), "JSON strings keep their quotes");
+        assert!(!is_value("1, \"Injected\": 2", Format::Json), "one value, never more members");
+        assert!(!is_value("[1, 2]", Format::Json));
     }
 
     #[test]
