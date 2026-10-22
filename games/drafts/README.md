@@ -22,7 +22,7 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | Dota 2 | #10 · 46.3K | 22.3K | #2 · 960,326 | draft |
 | ARC Raiders | #11 · 41.3K | – | #14 · 81,817 | draft |
 | Overwatch 2 | #13 · 29.3K | – | #25 · 57,140 | draft |
-| Call of Duty: Modern Warfare 4 | #15 · 27.9K | 17.6K | #9 · 119,808 (Call of Duty app) | needs an engine addition |
+| Call of Duty: Modern Warfare 4 | #15 · 27.9K | 17.6K | #9 · 119,808 (Call of Duty app) | draft (call-of-duty) |
 | Deadlock | #17 · 24.8K | – | #5 · 206,050 | draft |
 | WARDOGS | #18 · 24.5K | 5.0K | #7 · 170,247 | draft |
 | Marvel Rivals | #20 · 18.6K | – | #33 · 45,742 | draft |
@@ -30,7 +30,7 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | Escape from Tarkov | #31 · 10.6K | – | #71 · 21,374 | needs an engine addition |
 | Rocket League | #36 · 9.8K | – | #61 · 25,598 | shipped in v1 |
 | Rainbow Six Siege | #38 · 9.7K | – | #20 · 62,306 | needs an engine addition |
-| Call of Duty: Warzone | #39 · 9.5K | – | (Call of Duty app) | needs an engine addition |
+| Call of Duty: Warzone | #39 · 9.5K | – | (Call of Duty app) | draft (call-of-duty) |
 | PUBG: Battlegrounds | – | – | #3 · 287,432 | draft |
 | Rust | – | 6.8K | #10 · 112,054 | needs an engine addition |
 | Delta Force | – | – | #34 · 45,677 (peak 106,853) | draft |
@@ -68,6 +68,7 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | pubg | `%LOCALAPPDATA%\TslGame\...\WindowsNoEditor\GameUserSettings.ini` | high | Graphics may sit in one `ScalabilityGroups=(...)` value. If so, the whole bracketed value is one setting. |
 | delta-force | `{install}/Game/DeltaForce/Saved/Config/WindowsClient/GameUserSettings.ini` | medium ([Steam discussion](https://steamcommunity.com/app/2507950/discussions/0/595136892797804254)) | Process name unknown. Check whether an `%LOCALAPPDATA%\DeltaForce` copy wins instead. |
 | the-finals | `%LOCALAPPDATA%\Discovery\...\WindowsClient\GameUserSettings.ini` | low (inferred from Unreal's layout) | Confirm the folder name first. |
+| call-of-duty | `%LOCALAPPDATA%\Activision\Call of Duty\players\s.1.0.cod26.txt0` (cod) | medium (a third-party MW4 script and real Black Ops 6 files) | One draft covers MW4 and Warzone, since both run in the Call of Duty app. I couldn't confirm that Warzone reads this same file. This is where Battle.net keeps it. Steam keeps it in `Documents\Call of Duty\players`, and a game file can point at only one folder for now. If `s.1.0.cod26.txt1` sits beside it, add it as a second file with the same settings. Confirm `cod26-cod.exe` in Task Manager while MW4 runs. |
 
 ## Finishing a draft
 
@@ -81,13 +82,22 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
    - the sign command it prints
 6. Benchmark it and add `proof` (rig, avg and 1% lows before and after, method). Without it, the app shows no performance claim.
 
+## File formats
+
+Each file in `files` names its `format`. Write keys and values exactly as the file stores them.
+
+| Format | Lines it edits | `key` | Notes |
+|---|---|---|---|
+| `ini` | `Key=Value` under `[Section]` | the key, plus `section` | |
+| `kv` | `"key"  "value"` (Valve) | the key | No quotes in values. |
+| `cod` | `Name@0;id;id = value // note` (Call of Duty) | `Name@0`: the name and its variant | The ids and notes stay as the game wrote them. Chamber can't add a setting the file lacks. No `//` in values. |
+
 ## Games that need an engine addition first
 
 Each needs one small, tested addition to the engine. Add it when you're ready to write that game's config.
 
 | Game | What's missing |
 |---|---|
-| Call of Duty (MW4, Warzone) | Settings live in `Documents\Call of Duty\players\*.cst`, written as `Name@0;id = value`. Needs a `cst` format. |
 | Rainbow Six Siege | `GameSettings.ini` sits in a per-account folder (`My Games\Rainbow Six - Siege\<id>\`). Needs one wildcard folder segment. |
 | Rust | `cfg/client.cfg` uses `graphics.setting "value"` lines. Needs a convar format. |
 | Battlefield 6 | `PROFSAVE_profile` uses `GstRender.Setting value` lines. Needs a space-separated format. |

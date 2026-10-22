@@ -3,6 +3,7 @@
 
 use std::fs;
 use std::io;
+use std::ops::Range;
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -152,10 +153,39 @@ pub fn ini_remove(text: &str, section: &str, key: &str) -> String {
     all.into_iter().enumerate().filter(|(i, _)| !hits.contains(i)).map(|(_, l)| l).collect()
 }
 
+// ---------- line formats: one setting per line ----------
+
+/// Finds the setting on one line: its key and the byte range of its value.
+type Parse = fn(&str) -> Option<(&str, Range<usize>)>;
+
+fn line_get(text: &str, key: &str, parse: Parse) -> Option<String> {
+    // The last copy wins, as when the game reads the file top to bottom.
+    lines(text).iter().rev().find_map(|l| parse(l).filter(|(k, _)| k.eq_ignore_ascii_case(key)).map(|(_, v)| l[v].to_string()))
+}
+
+/// Every copy of `key` gets the value. None when no line holds `key`.
+fn line_set(text: &str, key: &str, value: &str, parse: Parse) -> Option<String> {
+    let mut all = lines(text);
+    let mut found = false;
+    for line in &mut all {
+        if let Some((k, range)) = parse(line) {
+            if k.eq_ignore_ascii_case(key) {
+                line.replace_range(range, value);
+                found = true;
+            }
+        }
+    }
+    found.then(|| all.concat())
+}
+
+fn line_remove(text: &str, key: &str, parse: Parse) -> String {
+    lines(text).into_iter().filter(|l| !parse(l).is_some_and(|(k, _)| k.eq_ignore_ascii_case(key))).collect()
+}
+
 // ---------- Valve KeyValues (flat files like cs2_video.txt) ----------
 
-/// The quoted key and value on a `"key"  "value"` line, with the value's byte range.
-fn kv_parse(line: &str) -> Option<(&str, &str, std::ops::Range<usize>)> {
+/// The quoted key on a `"key"  "value"` line, with the value's byte range.
+fn kv_parse(line: &str) -> Option<(&str, Range<usize>)> {
     let body = split_eol(line).0;
     let start = body.find('"')?;
     if !body[..start].trim().is_empty() {
@@ -168,43 +198,52 @@ fn kv_parse(line: &str) -> Option<(&str, &str, std::ops::Range<usize>)> {
         return None;
     }
     let vend = vstart + 1 + body[vstart + 1..].find('"')?;
-    Some((&body[start + 1..key_end], &body[vstart + 1..vend], vstart + 1..vend))
+    Some((&body[start + 1..key_end], vstart + 1..vend))
 }
 
 pub fn kv_get(text: &str, key: &str) -> Option<String> {
-    lines(text)
-        .iter()
-        .rev()
-        .find_map(|l| kv_parse(l).filter(|(k, _, _)| k.eq_ignore_ascii_case(key)).map(|(_, v, _)| v.to_string()))
+    line_get(text, key, kv_parse)
 }
 
 // ponytail: flat files only. Nested blocks (vcfg "convars") need an insert that finds the block.
 pub fn kv_set(text: &str, key: &str, value: &str) -> Result<String, String> {
+    if let Some(out) = line_set(text, key, value, kv_parse) {
+        return Ok(out);
+    }
     let mut all = lines(text);
-    let mut found = false;
-    for line in &mut all {
-        if let Some((k, _, range)) = kv_parse(line) {
-            if k.eq_ignore_ascii_case(key) {
-                line.replace_range(range, value);
-                found = true;
-            }
-        }
-    }
-    if !found {
-        let close = all
-            .iter()
-            .rposition(|l| split_eol(l).0.trim() == "}")
-            .ok_or_else(|| format!("couldn't find where to add {key}"))?;
-        push_line(&mut all, close, format!("\t\"{key}\"\t\t\"{value}\""), newline(text));
-    }
+    let close = all
+        .iter()
+        .rposition(|l| split_eol(l).0.trim() == "}")
+        .ok_or_else(|| format!("couldn't find where to add {key}"))?;
+    push_line(&mut all, close, format!("\t\"{key}\"\t\t\"{value}\""), newline(text));
     Ok(all.concat())
 }
 
 pub fn kv_remove(text: &str, key: &str) -> String {
-    lines(text)
-        .into_iter()
-        .filter(|l| !kv_parse(l).is_some_and(|(k, _, _)| k.eq_ignore_ascii_case(key)))
-        .collect()
+    line_remove(text, key, kv_parse)
+}
+
+// ---------- Call of Duty (s.1.0.cod26.txt0: `Name@0;id;id = value // note`) ----------
+
+/// The `Name@variant` key on a setting line, with the value's byte range (before any `//` note).
+fn cod_parse(line: &str) -> Option<(&str, Range<usize>)> {
+    let (head, rest) = split_eol(line).0.split_once(" = ")?;
+    let start = head.len() + 3;
+    let end = start + rest.find(" //").unwrap_or(rest.len());
+    Some((head.split_once(';').map_or(head, |(name, _)| name), start..end))
+}
+
+pub fn cod_get(text: &str, key: &str) -> Option<String> {
+    line_get(text, key, cod_parse)
+}
+
+/// The ids after each name are the game's own, so a setting the file lacks is refused, never invented.
+pub fn cod_set(text: &str, key: &str, value: &str) -> Result<String, String> {
+    line_set(text, key, value, cod_parse).ok_or_else(|| format!("couldn't find {key} in the settings file"))
+}
+
+pub fn cod_remove(text: &str, key: &str) -> String {
+    line_remove(text, key, cod_parse)
 }
 
 // ---------- files ----------
@@ -289,13 +328,44 @@ mod tests {
         assert_eq!(kv_get(VIDEO, "video.cfg"), None, "block names aren't settings");
     }
 
+    // Lines from a real Black Ops 6 file (MW4's cod26 file uses the same format), with a non-ASCII note.
+    const COD: &str = "1\n\n//\n// Display\n\n// Réduit la latence\nNvidiaReflex@0;33761;11445 = Enabled // one of Disabled, Enabled, Enabled + boost\n\n// Ray tracing\nDxrMode@0;37334;7764 = Off // one of Off, On\nDxrMode@1;8707;7764 = Low // one of Off, Low, Medium, High, Ultra\nShowBlood@0;57752;20945 = true\n";
+
+    #[test]
+    fn cod_reads_values_by_name_and_variant() {
+        assert_eq!(cod_get(COD, "NvidiaReflex@0").as_deref(), Some("Enabled"));
+        assert_eq!(cod_get(COD, "nvidiareflex@0").as_deref(), Some("Enabled"));
+        assert_eq!(cod_get(COD, "DxrMode@1").as_deref(), Some("Low"), "each variant is its own setting");
+        assert_eq!(cod_get(COD, "ShowBlood@0").as_deref(), Some("true"), "a value with no note");
+        assert_eq!(cod_get(COD, "DxrMode"), None, "the variant is part of the key");
+    }
+
+    #[test]
+    fn cod_set_keeps_ids_notes_and_line_endings() {
+        let out = cod_set(COD, "DxrMode@1", "Off").unwrap();
+        assert_eq!(out, COD.replace("DxrMode@1;8707;7764 = Low //", "DxrMode@1;8707;7764 = Off //"));
+        let crlf = COD.replace('\n', "\r\n");
+        let out = cod_set(&crlf, "NvidiaReflex@0", "Enabled + boost").unwrap();
+        assert_eq!(out, crlf.replace("= Enabled //", "= Enabled + boost //"));
+        assert_eq!(cod_set(&out, "NvidiaReflex@0", "Enabled").unwrap(), crlf, "setting it back restores every byte");
+    }
+
+    #[test]
+    fn cod_refuses_settings_the_file_lacks() {
+        // The ids after each name come from the game, so Chamber can't write a new line.
+        assert!(cod_set(COD, "MotionBlur@0", "Off").is_err());
+        assert_eq!(cod_remove(COD, "ShowBlood@0"), COD.replace("ShowBlood@0;57752;20945 = true\n", ""));
+    }
+
     #[test]
     fn encodings_round_trip_byte_for_byte() {
-        for enc in [Encoding::Utf8, Encoding::Utf8Bom, Encoding::Utf16Le] {
-            let bytes = encode(enc, UE);
-            let (found, text) = decode(&bytes).unwrap();
-            assert_eq!(found, enc);
-            assert_eq!(encode(found, &text), bytes);
+        for text in [UE, VIDEO, COD] {
+            for enc in [Encoding::Utf8, Encoding::Utf8Bom, Encoding::Utf16Le] {
+                let bytes = encode(enc, text);
+                let (found, decoded) = decode(&bytes).unwrap();
+                assert_eq!(found, enc);
+                assert_eq!(encode(found, &decoded), bytes);
+            }
         }
         assert!(decode(&[0x80, 0x81]).is_err(), "invalid UTF-8 is refused");
     }

@@ -16,7 +16,7 @@ const MODULUS_HEX: &str = "cdb8a11eb62f5182fdc5707fcd873c78302beec9455d6095ba77c
 /// Path roots a game file may live under. Anything else is rejected.
 pub const TOKENS: [&str; 6] = ["localappdata", "appdata", "documents", "savedgames", "steamuserdata", "install"];
 const LAUNCHERS: [&str; 7] = ["steam", "epic", "riot", "battlenet", "ea", "ubisoft", "other"];
-const EXTENSIONS: [&str; 4] = ["ini", "txt", "cfg", "vcfg"];
+const EXTENSIONS: [&str; 6] = ["ini", "txt", "cfg", "vcfg", "txt0", "txt1"];
 const VARIABLES: [&str; 3] = ["{refresh}", "{width}", "{height}"];
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -63,6 +63,8 @@ pub struct Find {
 pub enum Format {
     Ini,
     Kv,
+    /// Call of Duty's settings file: `Name@0;id;id = value // note` lines.
+    Cod,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -199,14 +201,14 @@ impl Catalog {
                 for s in &f.settings {
                     let section_ok = match (f.format, &s.section) {
                         (Format::Ini, Some(sec)) => is_section(sec),
-                        (Format::Kv, None) => true,
+                        (format, None) => format != Format::Ini,
                         _ => false,
                     };
                     if !section_ok {
-                        return fail(format!("{}: ini settings need a section, kv settings take none", s.key));
+                        return fail(format!("{}: ini settings need a section, other formats take none", s.key));
                     }
                     let values_ok = s.values.iter().all(|(k, v)| is_value(k, f.format) && is_text(v));
-                    if !is_key(&s.key) || !is_value(&s.value, f.format) || !is_text(&s.label) || !is_text(&s.why) || !values_ok {
+                    if !is_key(&s.key, f.format) || !is_value(&s.value, f.format) || !is_text(&s.label) || !is_text(&s.why) || !values_ok {
                         return fail(format!("bad setting {:?}", s.key));
                     }
                 }
@@ -278,19 +280,29 @@ fn is_section(s: &str) -> bool {
     !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || "/._: -".contains(c))
 }
 
-fn is_key(s: &str) -> bool {
-    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c))
+/// Call of Duty keys name the variant too (`DxrMode@1`): one name can hold several settings.
+fn is_key(s: &str, format: Format) -> bool {
+    let plain = |k: &str| !k.is_empty() && k.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c));
+    match format {
+        Format::Cod => s.split_once('@').is_some_and(|(name, n)| plain(name) && !n.is_empty() && n.chars().all(|c| c.is_ascii_digit())),
+        _ => plain(s),
+    }
 }
 
-/// Values are written into files: no line breaks or unknown {variables}, and no quotes in
-/// Valve files where a quote would end the value. INI values may carry quotes (Overwatch uses them).
+/// Values are written into files: no line breaks or unknown {variables}, and nothing that ends
+/// the value early: a quote in Valve files, a `//` note in Call of Duty files. INI values may
+/// carry quotes (Overwatch uses them).
 fn is_value(s: &str, format: Format) -> bool {
     let mut rest = s.to_string();
     for v in VARIABLES {
         rest = rest.replace(v, "");
     }
-    let quotes_ok = format == Format::Ini || !s.contains('"');
-    quotes_ok && !s.chars().any(char::is_control) && !rest.contains(['{', '}'])
+    let fits = match format {
+        Format::Ini => true,
+        Format::Kv => !s.contains('"'),
+        Format::Cod => !s.contains("//"),
+    };
+    fits && !s.chars().any(char::is_control) && !rest.contains(['{', '}'])
 }
 
 fn is_exe(s: &str) -> bool {
@@ -322,6 +334,7 @@ mod tests {
     fn paths_reject_escapes_and_unknown_roots() {
         assert!(check_path("{localappdata}/FortniteGame/Saved/GameUserSettings.ini", true).is_ok());
         assert!(check_path("{documents}/My Games/Rocket League (x)/a.ini", true).is_ok());
+        assert!(check_path("{localappdata}/Activision/Call of Duty/players/s.1.0.cod26.txt0", true).is_ok());
         for bad in [
             "C:/Windows/system.ini",
             "{localappdata}/../x.ini",
@@ -355,6 +368,18 @@ mod tests {
         assert!(!is_value("1\n[Other]\nKey=2", Format::Ini));
         assert!(!is_value("1\" \"evil", Format::Kv), "a quote would end a Valve value");
         assert!(!is_value("{username}", Format::Ini));
+        assert!(is_value("Enabled + boost", Format::Cod));
+        assert!(!is_value("Off // On", Format::Cod), "a // note would cut a Call of Duty value short");
+    }
+
+    #[test]
+    fn cod_keys_name_their_variant() {
+        assert!(is_key("DxrMode@1", Format::Cod));
+        assert!(!is_key("DxrMode", Format::Cod), "the variant picks which DxrMode line");
+        assert!(!is_key("DxrMode@", Format::Cod));
+        assert!(!is_key("DxrMode@1;8707", Format::Cod), "the ids belong to the file");
+        assert!(is_key("sg.ShadowQuality", Format::Ini));
+        assert!(!is_key("Shadow@1", Format::Ini));
     }
 
     /// Drafts have no settings yet, but their structure and paths must already be valid.
