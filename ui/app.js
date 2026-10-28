@@ -401,7 +401,7 @@ function welcome(terms) {
       const libs = el("div", "libs");
       $("welcome-body").replaceChildren(
         el("p", null, "I look in Steam (every library drive), Epic, Riot, and Windows' list of installed apps, which covers Battle.net, EA, and Ubisoft."),
-        el("p", null, "Keep games somewhere else, like D:\\Games? Add that folder and I'll look one or two folders inside it. You can change this later in Library."),
+        el("p", null, "Keep games somewhere else, like D:\\Games? Add that folder and I'll look through it, including a folder per launcher like D:\\Games\\Steam. You can change this later in Library."),
         libs,
       );
       renderLibraries();

@@ -54,16 +54,24 @@ impl Pc {
     }
 }
 
-/// Install folder of a game inside one of the player's library folders: the folder one or two
-/// levels down that holds `exe` (D:\Games\Fortnite or D:\Games\Epic Games\Fortnite).
-/// Only checks whether files exist, so a big drive costs a few hundred lookups, not a walk.
+/// Install folder of a game inside one of the player's library folders: the shallowest folder
+/// up to four levels down that holds `exe`. Four levels covers a folder per launcher with that
+/// launcher's own layout inside, e.g. D:\Games\Steam\steamapps\common\<game> and
+/// D:\Games\Epic Games\<game>.
+// ponytail: lists every folder to that depth on each scan (a few hundred on a typical games
+// drive). Cache the folder list per scan if a big drive makes scans slow.
 pub fn find_in_libraries(libs: &[PathBuf], exe: &str) -> Option<PathBuf> {
-    let children = |dir: &Path| -> Vec<PathBuf> {
+    let children = |dir: &PathBuf| -> Vec<PathBuf> {
         std::fs::read_dir(dir).map(|it| it.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect()).unwrap_or_default()
     };
-    libs.iter().flat_map(|lib| children(lib)).find_map(|child| {
-        std::iter::once(child.clone()).chain(children(&child)).find(|dir| dir.join(exe).is_file())
-    })
+    let mut level = libs.to_vec();
+    for _ in 0..4 {
+        level = level.iter().flat_map(children).collect();
+        if let Some(hit) = level.iter().find(|dir| dir.join(exe).is_file()) {
+            return Some(hit.clone());
+        }
+    }
+    None
 }
 
 /// The quoted values on a VDF line, e.g. `"path"  "D:\\SteamLibrary"` -> ["path", "D:\SteamLibrary"].
@@ -294,20 +302,20 @@ mod tests {
     }
 
     #[test]
-    fn library_folders_find_games_one_or_two_levels_down() {
+    fn library_folders_find_games_in_each_launchers_layout() {
         let lib = temp("library");
         let exe = "Binaries/Win64/Game.exe";
-        for dir in ["Fortnite", "Epic Games/Rocket League", "Empty"] {
-            std::fs::create_dir_all(lib.join(dir)).unwrap();
-        }
-        for game in ["Fortnite", "Epic Games/Rocket League"] {
+        let place = |game: &str| {
             std::fs::create_dir_all(lib.join(game).join("Binaries/Win64")).unwrap();
-        }
-        std::fs::write(lib.join("Epic Games/Rocket League").join(exe), "").unwrap();
+            std::fs::write(lib.join(game).join(exe), "").unwrap();
+        };
         let libs = vec![lib.join("missing"), lib.clone()];
+        assert_eq!(find_in_libraries(&libs, exe), None);
+        place("Steam/steamapps/common/Rocket League");
+        assert_eq!(find_in_libraries(&libs, exe), Some(lib.join("Steam/steamapps/common/Rocket League")));
+        place("Epic Games/Rocket League"); // the shallowest copy wins
         assert_eq!(find_in_libraries(&libs, exe), Some(lib.join("Epic Games/Rocket League")));
-        std::fs::write(lib.join("Fortnite").join(exe), "").unwrap();
-        assert!(find_in_libraries(&libs, exe).is_some());
+        place("a/b/c/d/Too Deep");
         assert_eq!(find_in_libraries(&libs, "Other.exe"), None);
         std::fs::remove_dir_all(lib).unwrap();
     }
