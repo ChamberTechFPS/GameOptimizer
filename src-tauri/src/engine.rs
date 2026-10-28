@@ -2,7 +2,7 @@
 //! catalog passed its signature check, and only to the keys that game lists.
 
 use crate::catalog::{self, Catalog, FileTarget, Format, Game, ManualSetting, Proof, Setting};
-use crate::detect::Pc;
+use crate::detect::{self, Pc};
 use crate::patch;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -23,6 +23,10 @@ pub struct Engine {
 pub struct State {
     /// Highest catalog version installed. Older downloads are refused (no rollbacks).
     pub catalog_version: u64,
+    /// Version of the terms the player accepted; 0 = not yet.
+    pub terms: u32,
+    /// Extra folders to look for games in, e.g. D:\Games.
+    pub libraries: Vec<PathBuf>,
     pub games: BTreeMap<String, GameState>,
 }
 
@@ -157,13 +161,17 @@ impl Engine {
     }
 
     /// Install folder and the launcher it was found through: the player's pick, then launcher
-    /// records, then the game's own folders. An empty path means installed, location unknown.
-    fn locate(&self, g: &Game, gs: Option<&GameState>, pc: &Pc) -> Option<(PathBuf, String)> {
+    /// records, then the player's library folders, then the game's own folders. An empty path
+    /// means installed, location unknown.
+    fn locate(&self, g: &Game, gs: Option<&GameState>, libs: &[PathBuf], pc: &Pc) -> Option<(PathBuf, String)> {
         if let Some(folder) = gs.and_then(|s| s.folder.as_ref()).filter(|f| f.is_dir()) {
             return Some((folder.clone(), g.launcher.clone()));
         }
         if let Some((location, via)) = pc.install_location(g) {
             return Some((location, via.unwrap_or(&g.launcher).to_string()));
+        }
+        if let Some(found) = g.find.exe.as_deref().and_then(|exe| detect::find_in_libraries(libs, exe)) {
+            return Some((found, g.launcher.clone()));
         }
         let roots = roots(pc, None);
         let found = g.find.paths.iter().filter_map(|p| catalog::expand(p, &roots).ok()).find(|p| p.exists());
@@ -172,11 +180,11 @@ impl Engine {
 
     pub fn scan(&self, cat: &Catalog, pc: &Pc) -> Result<Vec<GameView>, String> {
         let state = self.load_state()?;
-        Ok(cat.games.iter().map(|g| self.view(g, state.games.get(&g.slug), pc)).collect())
+        Ok(cat.games.iter().map(|g| self.view(g, state.games.get(&g.slug), &state.libraries, pc)).collect())
     }
 
-    fn view(&self, g: &Game, gs: Option<&GameState>, pc: &Pc) -> GameView {
-        let (location, launcher) = match self.locate(g, gs, pc) {
+    fn view(&self, g: &Game, gs: Option<&GameState>, libs: &[PathBuf], pc: &Pc) -> GameView {
+        let (location, launcher) = match self.locate(g, gs, libs, pc) {
             Some((path, via)) => (Some(path), via),
             None => (None, g.launcher.clone()),
         };
@@ -256,7 +264,7 @@ impl Engine {
         let mut state = self.load_state()?;
         let gs = state.games.entry(slug.to_string()).or_default();
         let (location, _) = self
-            .locate(g, Some(gs), pc)
+            .locate(g, Some(gs), &state.libraries, pc)
             .ok_or_else(|| format!("{} isn't installed here. Set its folder in Library.", g.name))?;
         let roots = roots(pc, Some(&location));
         let mut targets = Vec::new();
@@ -406,6 +414,29 @@ impl Engine {
         self.update(slug, |gs| gs.hidden = hidden)
     }
 
+    pub fn accept_terms(&self, version: u32) -> Result<(), String> {
+        let mut state = self.load_state()?;
+        state.terms = state.terms.max(version);
+        self.save_state(&state)
+    }
+
+    pub fn add_library(&self, folder: &Path) -> Result<(), String> {
+        if !folder.is_absolute() || !folder.is_dir() {
+            return Err("That folder doesn't exist.".into());
+        }
+        let mut state = self.load_state()?;
+        if !state.libraries.iter().any(|l| l.as_os_str().eq_ignore_ascii_case(folder.as_os_str())) {
+            state.libraries.push(folder.to_path_buf());
+        }
+        self.save_state(&state)
+    }
+
+    pub fn remove_library(&self, folder: &Path) -> Result<(), String> {
+        let mut state = self.load_state()?;
+        state.libraries.retain(|l| !l.as_os_str().eq_ignore_ascii_case(folder.as_os_str()));
+        self.save_state(&state)
+    }
+
     fn update(&self, slug: &str, change: impl FnOnce(&mut GameState)) -> Result<(), String> {
         let mut state = self.load_state()?;
         change(state.games.entry(slug.to_string()).or_default());
@@ -420,7 +451,7 @@ impl Engine {
             return if dir.is_dir() { Ok(dir) } else { Err("No backups yet.".into()) };
         }
         let state = self.load_state()?;
-        let location = self.locate(g, state.games.get(slug), pc).map(|(path, _)| path);
+        let location = self.locate(g, state.games.get(slug), &state.libraries, pc).map(|(path, _)| path);
         let roots = roots(pc, location.as_deref());
         g.files
             .iter()
@@ -664,6 +695,22 @@ mod tests {
         assert!(fx.engine.set_hidden(&fx.cat, "not-a-game", true).is_err());
         fx.engine.clear_folder(&fx.cat, "test-game").unwrap();
         assert_eq!(fx.engine.scan(&fx.cat, &fx.pc).unwrap()[0].folder, None);
+    }
+
+    #[test]
+    fn terms_and_library_folders_persist() {
+        let fx = fixture("terms");
+        fs::create_dir_all(&fx.engine.data).unwrap();
+        fs::write(fx.engine.data.join("state.json"), r#"{"catalogVersion": 1, "games": {}}"#).unwrap();
+        assert_eq!(fx.engine.load_state().unwrap().terms, 0);
+        fx.engine.accept_terms(1).unwrap();
+        fx.engine.add_library(&fx.root).unwrap();
+        fx.engine.add_library(&fx.root).unwrap();
+        assert!(fx.engine.add_library(Path::new("relative/dir")).is_err());
+        let state = fx.engine.load_state().unwrap();
+        assert_eq!((state.terms, state.libraries.clone()), (1, vec![fx.root.clone()]));
+        fx.engine.remove_library(&fx.root).unwrap();
+        assert!(fx.engine.load_state().unwrap().libraries.is_empty());
     }
 
     #[test]

@@ -3,7 +3,7 @@
   "name": "Fortnite",
   "tile": "FN",
   "launcher": "epic",
-  "find": { "epic": "Fortnite", "paths": ["{localappdata}/FortniteGame"] },
+  "find": { "epic": "Fortnite", "paths": ["{localappdata}/FortniteGame"], "exe": "FortniteGame/Binaries/Win64/FortniteClient-Win64-Shipping.exe" },
   "process": ["FortniteClient-Win64-Shipping.exe"],
   "files": [
     {

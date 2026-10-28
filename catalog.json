@@ -1,5 +1,5 @@
 {
-  "version": 1792692547,
+  "version": 1793191480,
   "games": [
     {
       "slug": "cs2",
@@ -7,7 +7,8 @@
       "tile": "CS",
       "launcher": "steam",
       "find": {
-        "steam": 730
+        "steam": 730,
+        "exe": "game/bin/win64/cs2.exe"
       },
       "process": [
         "cs2.exe"
@@ -105,7 +106,7 @@
           ]
         }
       ],
-      "rev": "18f5c1a1"
+      "rev": "05f67bf6"
     },
     {
       "slug": "fortnite",
@@ -116,7 +117,8 @@
         "epic": "Fortnite",
         "paths": [
           "{localappdata}/FortniteGame"
-        ]
+        ],
+        "exe": "FortniteGame/Binaries/Win64/FortniteClient-Win64-Shipping.exe"
       },
       "process": [
         "FortniteClient-Win64-Shipping.exe"
@@ -292,7 +294,7 @@
           ]
         }
       ],
-      "rev": "edbf2701"
+      "rev": "346fc052"
     },
     {
       "slug": "rocket-league",
@@ -304,7 +306,8 @@
         "epic": "Rocket League",
         "paths": [
           "{documents}/My Games/Rocket League"
-        ]
+        ],
+        "exe": "Binaries/Win64/RocketLeague.exe"
       },
       "process": [
         "RocketLeague.exe"
@@ -383,7 +386,7 @@
           ]
         }
       ],
-      "rev": "4b4cd890"
+      "rev": "1003ebc8"
     },
     {
       "slug": "valorant",
@@ -394,7 +397,8 @@
         "uninstall": "VALORANT",
         "paths": [
           "{localappdata}/VALORANT"
-        ]
+        ],
+        "exe": "live/VALORANT.exe"
       },
       "process": [
         "VALORANT-Win64-Shipping.exe"
@@ -471,7 +475,7 @@
           "why": "Cuts the delay between your click and the shot on NVIDIA cards."
         }
       ],
-      "rev": "166a2ff6"
+      "rev": "b9471131"
     }
   ]
 }

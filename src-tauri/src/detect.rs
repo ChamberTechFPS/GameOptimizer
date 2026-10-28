@@ -54,6 +54,18 @@ impl Pc {
     }
 }
 
+/// Install folder of a game inside one of the player's library folders: the folder one or two
+/// levels down that holds `exe` (D:\Games\Fortnite or D:\Games\Epic Games\Fortnite).
+/// Only checks whether files exist, so a big drive costs a few hundred lookups, not a walk.
+pub fn find_in_libraries(libs: &[PathBuf], exe: &str) -> Option<PathBuf> {
+    let children = |dir: &Path| -> Vec<PathBuf> {
+        std::fs::read_dir(dir).map(|it| it.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect()).unwrap_or_default()
+    };
+    libs.iter().flat_map(|lib| children(lib)).find_map(|child| {
+        std::iter::once(child.clone()).chain(children(&child)).find(|dir| dir.join(exe).is_file())
+    })
+}
+
 /// The quoted values on a VDF line, e.g. `"path"  "D:\\SteamLibrary"` -> ["path", "D:\SteamLibrary"].
 fn vdf_tokens(line: &str) -> Vec<String> {
     line.split('"').skip(1).step_by(2).map(|t| t.replace("\\\\", "\\")).collect()
@@ -279,6 +291,25 @@ mod tests {
         assert!(libs.contains(&PathBuf::from("D:\\SteamLibrary")));
         assert!(libs.contains(&PathBuf::from("C:\\Program Files (x86)\\Steam")));
         std::fs::remove_dir_all(steam).unwrap();
+    }
+
+    #[test]
+    fn library_folders_find_games_one_or_two_levels_down() {
+        let lib = temp("library");
+        let exe = "Binaries/Win64/Game.exe";
+        for dir in ["Fortnite", "Epic Games/Rocket League", "Empty"] {
+            std::fs::create_dir_all(lib.join(dir)).unwrap();
+        }
+        for game in ["Fortnite", "Epic Games/Rocket League"] {
+            std::fs::create_dir_all(lib.join(game).join("Binaries/Win64")).unwrap();
+        }
+        std::fs::write(lib.join("Epic Games/Rocket League").join(exe), "").unwrap();
+        let libs = vec![lib.join("missing"), lib.clone()];
+        assert_eq!(find_in_libraries(&libs, exe), Some(lib.join("Epic Games/Rocket League")));
+        std::fs::write(lib.join("Fortnite").join(exe), "").unwrap();
+        assert!(find_in_libraries(&libs, exe).is_some());
+        assert_eq!(find_in_libraries(&libs, "Other.exe"), None);
+        std::fs::remove_dir_all(lib).unwrap();
     }
 
     #[test]

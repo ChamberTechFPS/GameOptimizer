@@ -4,6 +4,7 @@
   "tile": "LOL",
   "launcher": "riot",
   "find": {
+    "exe": "Game/League of Legends.exe",
     "uninstall": "League of Legends"
   },
   "process": [

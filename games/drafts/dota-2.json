@@ -4,6 +4,7 @@
   "tile": "D2",
   "launcher": "steam",
   "find": {
+    "exe": "game/bin/win64/dota2.exe",
     "steam": 570
   },
   "process": [

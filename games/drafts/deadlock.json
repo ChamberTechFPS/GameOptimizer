@@ -4,6 +4,7 @@
   "tile": "DL",
   "launcher": "steam",
   "find": {
+    "exe": "game/bin/win64/deadlock.exe",
     "steam": 1422450
   },
   "process": [

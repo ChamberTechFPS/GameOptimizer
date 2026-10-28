@@ -6,7 +6,7 @@ I optimize gaming PCs at [ChamberTech](https://www.chambertech.net). This app do
 
 ## What it does
 
-- **Finds your games.** It checks Steam (every library drive), Epic, Riot, Battle.net, EA, and Ubisoft. If a game is installed somewhere unusual, point the app at the folder once and it remembers.
+- **Finds your games.** It checks Steam (every library drive), Epic, Riot, Battle.net, EA, and Ubisoft. Keep games somewhere else, like `D:\Games`? Add that folder in Library and the app looks inside it. You can also point a single game at its folder.
 - **Changes only what it lists.** Your sensitivity, binds, and crosshair stay yours.
 - **Shows its work.** For every setting you see your value, mine, and one line on why.
 - **Catches resets.** When a game update puts something back, the card says so, and Re-apply fixes it.
@@ -38,9 +38,13 @@ Each game shows my before and after once I've benchmarked it: average FPS and 1%
 - **Backups first.** The first change to any file copies the original to `%LOCALAPPDATA%\ChamberTech\GameOptimizer\backups`.
 - **No telemetry.**
 
+## Terms
+
+Using the app means accepting the [terms of use](ui/terms.md). The app asks on first launch. To change them, edit `ui/terms.md` and bump its `Version N` line: every player is asked to accept the new version.
+
 ## Publishing configs
 
-1. Edit or add `games/<game>.json`. To finish a new game, see [`games/drafts/README.md`](games/drafts/README.md).
+1. Edit or add `games/<game>.json`. Set `find.exe` (the exe's path inside the install folder) so the game turns up in players' own game folders. To finish a new game, see [`games/drafts/README.md`](games/drafts/README.md).
 2. Rebuild the catalog: `node tools/build-catalog.mjs`
 3. Sign it. Only the keyholder can do this:
    `openssl dgst -sha256 -sign ~/.config/chamber-signing/catalog-signing.key -out catalog.json.sig catalog.json`

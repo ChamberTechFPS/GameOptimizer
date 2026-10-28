@@ -4,6 +4,7 @@
   "tile": "EFT",
   "launcher": "other",
   "find": {
+    "exe": "EscapeFromTarkov.exe",
     "steam": 3932890,
     "paths": [
       "{appdata}/Battlestate Games/Escape from Tarkov"

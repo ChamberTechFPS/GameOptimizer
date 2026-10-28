@@ -4,6 +4,7 @@
   "tile": "AP",
   "launcher": "steam",
   "find": {
+    "exe": "r5apex.exe",
     "steam": 1172470,
     "uninstall": "Apex Legends",
     "paths": [

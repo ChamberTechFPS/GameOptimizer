@@ -25,7 +25,32 @@ fn with<T>(app: &State<'_, App>, f: impl FnOnce(&Engine) -> Result<T, String>) -
 
 #[tauri::command]
 async fn scan(app: State<'_, App>) -> Reply {
-    with(&app, |e| Ok(json!({ "games": e.scan(&e.catalog()?, &Pc::probe())? })))
+    with(&app, |e| {
+        let games = e.scan(&e.catalog()?, &Pc::probe())?;
+        let state = e.load_state()?;
+        Ok(json!({ "games": games, "terms": state.terms, "libraries": state.libraries }))
+    })
+}
+
+#[tauri::command]
+async fn accept_terms(app: State<'_, App>, version: u32) -> Reply {
+    with(&app, |e| e.accept_terms(version).map(|_| json!({})))
+}
+
+#[tauri::command]
+async fn add_library(app: State<'_, App>, path: PathBuf) -> Reply {
+    with(&app, |e| e.add_library(&path).map(|_| json!({})))
+}
+
+#[tauri::command]
+async fn remove_library(app: State<'_, App>, path: PathBuf) -> Reply {
+    with(&app, |e| e.remove_library(&path).map(|_| json!({})))
+}
+
+/// Declining the terms closes the app.
+#[tauri::command]
+fn quit(handle: tauri::AppHandle) {
+    handle.exit(0);
 }
 
 #[tauri::command]
@@ -84,7 +109,11 @@ fn main() {
             clear_folder,
             set_hidden,
             open_folder,
-            install_catalog
+            install_catalog,
+            accept_terms,
+            add_library,
+            remove_library,
+            quit
         ])
         .run(tauri::generate_context!())
         .expect("error while running Chamber Game Optimizer");

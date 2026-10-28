@@ -58,6 +58,9 @@ pub struct Find {
     pub uninstall: Option<String>,
     #[serde(default)]
     pub paths: Vec<String>,
+    /// The game's exe relative to its install folder, e.g. `FortniteGame/Binaries/Win64/x.exe`.
+    /// Finds the game inside the player's library folders.
+    pub exe: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -198,6 +201,13 @@ impl Catalog {
             for p in &g.find.paths {
                 if let Err(e) = check_path(p, false) {
                     return fail(e);
+                }
+            }
+            if let Some(exe) = &g.find.exe {
+                let segments: Vec<&str> = exe.split('/').collect();
+                let (name, dirs) = segments.split_last().unwrap_or((&"", &[]));
+                if !is_exe(name) || !dirs.iter().all(|d| is_segment(d)) {
+                    return fail(format!("bad find exe {exe:?}"));
                 }
             }
             if let Some(p) = g.process.iter().find(|p| !is_exe(p)) {
@@ -447,6 +457,23 @@ mod tests {
         assert_eq!(expand_all("{documents}/Siege/x.ini", &roots).unwrap(), [dir.join("Siege/x.ini")], "a plain path, even before it exists");
         assert!(expand("{documents}/Siege/*/GameSettings.ini", &roots).is_err(), "a single path never holds a *");
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn find_exe_stays_relative() {
+        let game = |exe: &str| -> Game {
+            serde_json::from_value(serde_json::json!({
+                "slug": "g", "name": "G", "tile": "G", "launcher": "other", "find": { "exe": exe },
+                "manual": [{ "label": "l", "value": "v", "why": "w" }]
+            }))
+            .unwrap()
+        };
+        for good in ["Game.exe", "FortniteGame/Binaries/Win64/FortniteClient-Win64-Shipping.exe"] {
+            assert!(Catalog { version: 0, games: vec![game(good)] }.validate().is_ok(), "{good}");
+        }
+        for bad in ["../Game.exe", "/Game.exe", "C:/Game.exe", "bin\\Game.exe", "bin/Game.dll", "a//Game.exe"] {
+            assert!(Catalog { version: 0, games: vec![game(bad)] }.validate().is_err(), "{bad}");
+        }
     }
 
     #[test]

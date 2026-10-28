@@ -79,7 +79,25 @@
       </div>
       <button class="btn btn-ghost btn-icon" type="button" data-close aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
     </div>
-    <ul id="sheet-list" class="sheet-list"></ul>
+    <div class="sheet-list">
+      <h3 class="libs-title">Game folders</h3>
+      <p class="meta">I also look one or two folders inside each of these.</p>
+      <div class="libs"></div>
+      <h3 class="libs-title">Games</h3>
+      <ul id="sheet-list"></ul>
+    </div>
+  </dialog>
+
+  <!-- First launch: accept the terms, then add game folders. Can't be dismissed until accepted. -->
+  <dialog id="welcome" class="sheet welcome" aria-labelledby="welcome-title">
+    <div class="sheet-head">
+      <div>
+        <h2 id="welcome-title"></h2>
+        <p id="welcome-sub" class="meta"></p>
+      </div>
+    </div>
+    <div id="welcome-body" class="sheet-list welcome-body"></div>
+    <div id="welcome-foot" class="drawer-foot"></div>
   </dialog>
 
   <div id="toast" class="toast" role="status" hidden></div>

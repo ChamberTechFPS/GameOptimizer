@@ -10,7 +10,7 @@ const RELEASES_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 const LAUNCHER = { steam: "Steam", epic: "Epic", riot: "Riot", battlenet: "Battle.net", ea: "EA", ubisoft: "Ubisoft", other: "PC" };
 const ORDER = { changed: 0, update: 1, "not-optimized": 2, "launch-once": 3, manual: 4, optimized: 5 };
 
-let view = { games: [] };
+let view = { games: [], terms: 0, libraries: [] };
 let appVersion = "1.0.0";
 let busy = false;
 let armedRevert = null; // Revert is two-step: first click arms it for 3 s
@@ -331,6 +331,86 @@ function openSheet() {
   if (!$("sheet").open) $("sheet").showModal();
 }
 
+// ---------- first launch + game folders ----------
+
+// The terms ship in ui/terms.md. Bumping its "Version N" line asks every player to accept again.
+async function loadTerms() {
+  const md = await fetch("terms.md").then((r) => r.text());
+  return { md, version: Number(md.match(/^Version (\d+)/m)?.[1] ?? 1) };
+}
+
+// Just enough Markdown for terms.md: ## headings, paragraphs, `code`, and [links](url).
+function markdown(md) {
+  return md.trim().split(/\n\s*\n/).filter((b) => !b.startsWith("# ")).map((block) => {
+    const heading = block.startsWith("## ");
+    const n = el(heading ? "h3" : "p");
+    for (const part of (heading ? block.slice(3) : block).split(/(`[^`]+`|\[[^\]]+\]\([^)]+\))/)) {
+      const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      if (link) n.append(button(link[1], "link", () => openUrl(link[2])));
+      else if (/^`.+`$/.test(part)) n.append(el("code", null, part.slice(1, -1)));
+      else n.append(part);
+    }
+    return n;
+  });
+}
+
+function renderLibraries() {
+  for (const box of document.querySelectorAll(".libs")) {
+    const rows = view.libraries.map((path) => {
+      const li = el("div", "row");
+      const info = el("div", "row-info");
+      const meta = el("div", "card-name", path);
+      meta.title = path;
+      info.append(meta);
+      li.append(info, button("Remove", "btn-ghost", () => removeLibrary(path)));
+      return li;
+    });
+    box.replaceChildren(...rows, button("Add folder", "", addLibrary, "folder"));
+  }
+}
+
+// Resolves once the player has accepted the terms and finished the folders step.
+function welcome(terms) {
+  const d = $("welcome");
+  let accepted = false;
+  return new Promise((resolve) => {
+    d.addEventListener("cancel", (e) => e.preventDefault());
+    d.addEventListener("close", () => { if (!accepted) d.showModal(); });
+
+    $("welcome-title").textContent = "Terms of use";
+    $("welcome-sub").textContent = "Read these before you start. Accept to use the app.";
+    $("welcome-body").replaceChildren(...markdown(terms.md));
+    $("welcome-foot").replaceChildren(
+      button("Decline", "btn-ghost", () => invoke("quit")),
+      button("Accept", "btn-primary", async () => {
+        try {
+          await invoke("accept_terms", { version: terms.version });
+        } catch (e) {
+          toast(errText(e), "error");
+          return;
+        }
+        accepted = true;
+        folders();
+      }),
+    );
+    d.showModal();
+
+    function folders() {
+      $("welcome-title").textContent = "Where your games are";
+      $("welcome-sub").textContent = "I already check the usual places. Add any others.";
+      const libs = el("div", "libs");
+      $("welcome-body").replaceChildren(
+        el("p", null, "I look in Steam (every library drive), Epic, Riot, and Windows' list of installed apps, which covers Battle.net, EA, and Ubisoft."),
+        el("p", null, "Keep games somewhere else, like D:\\Games? Add that folder and I'll look one or two folders inside it. You can change this later in Library."),
+        libs,
+      );
+      renderLibraries();
+      $("welcome-foot").replaceChildren(button("Done", "btn-primary", () => { d.close(); resolve(); }));
+      $("welcome-body").scrollTop = 0;
+    }
+  });
+}
+
 function renderSheet() {
   const games = [...view.games].sort((a, b) => a.name.localeCompare(b.name));
   $("sheet-list").replaceChildren(...games.map((g) => {
@@ -359,6 +439,7 @@ function renderSheet() {
 
 function rerender() {
   render();
+  renderLibraries();
   if ($("drawer").open) renderDrawer();
   if ($("sheet").open) renderSheet();
 }
@@ -431,6 +512,23 @@ const pickFolder = (g) => run(async () => {
   } catch (e) {
     toast(errText(e), "error");
   }
+  await scan();
+});
+
+const addLibrary = () => run(async () => {
+  const path = await window.__TAURI__.dialog.open({ directory: true, title: "Pick a folder that holds your games" });
+  if (!path) return;
+  try {
+    await invoke("add_library", { path });
+    toast(`Added ${path}`, "ok");
+  } catch (e) {
+    toast(errText(e), "error");
+  }
+  await scan();
+});
+
+const removeLibrary = (path) => run(async () => {
+  await invoke("remove_library", { path }).catch((e) => toast(errText(e), "error"));
   await scan();
 });
 
@@ -521,6 +619,8 @@ $("drawer").addEventListener("close", () => (drawerSlug = null));
   appVersion = await window.__TAURI__.app.getVersion().catch(() => appVersion);
   $("version").textContent = appVersion;
   await scan();
+  const terms = await loadTerms();
+  if (view.terms < terms.version) await welcome(terms);
   refreshCatalog();
   checkAppUpdate();
 })();

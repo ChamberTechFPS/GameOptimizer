@@ -4,6 +4,7 @@
   "tile": "OW",
   "launcher": "battlenet",
   "find": {
+    "exe": "_retail_/Overwatch.exe",
     "steam": 2357570,
     "uninstall": "Overwatch",
     "paths": [

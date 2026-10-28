@@ -116,9 +116,15 @@
     };
   }
 
+  // ?accepted skips the first-launch terms screen
+  const mockState = { terms: location.search.includes("accepted") ? 99 : 0, libraries: [] };
   const find = (slug) => games.find((g) => g.slug === slug);
   const commands = {
-    scan: () => ({ games: games.map(view) }),
+    scan: () => ({ games: games.map(view), terms: mockState.terms, libraries: mockState.libraries }),
+    accept_terms: ({ version }) => { mockState.terms = version; return {}; },
+    add_library: ({ path }) => { if (!mockState.libraries.includes(path)) mockState.libraries.push(path); return {}; },
+    remove_library: ({ path }) => { mockState.libraries = mockState.libraries.filter((l) => l !== path); return {}; },
+    quit: () => { console.log("quit"); return {}; },
     apply: ({ slug }) => {
       const g = find(slug);
       if (g.running) throw new Error(`Close ${g.name} first, then try again.`);
@@ -155,7 +161,7 @@
         }, 120);
       }),
     },
-    dialog: { open: async () => "D:\\Games\\Marvel Rivals" },
+    dialog: { open: async (o) => (o?.title?.startsWith("Pick a folder") ? "D:\\Games" : "D:\\Games\\Marvel Rivals") },
     opener: { openUrl: async (url) => console.log("openUrl", url) },
     app: { getVersion: async () => "1.0.0" },
   };

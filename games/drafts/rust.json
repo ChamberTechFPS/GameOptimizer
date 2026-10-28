@@ -4,6 +4,7 @@
   "tile": "RU",
   "launcher": "steam",
   "find": {
+    "exe": "RustClient.exe",
     "steam": 252490
   },
   "process": [

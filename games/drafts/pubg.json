@@ -4,6 +4,7 @@
   "tile": "PG",
   "launcher": "steam",
   "find": {
+    "exe": "TslGame/Binaries/Win64/TslGame.exe",
     "steam": 578080,
     "paths": [
       "{localappdata}/TslGame"
