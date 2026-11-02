@@ -86,6 +86,19 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
    - the sign command it prints
 6. Benchmark it and add `proof` (rig, avg and 1% lows before and after, method). Without it, the app shows no performance claim.
 
+## Values that depend on the PC
+
+A `value` can hold placeholders that the app fills in for each PC when it applies the config. The player sees the real number.
+
+| Placeholder | Filled with |
+|---|---|
+| `{refresh}`, `{width}`, `{height}` | The main monitor's refresh rate and resolution |
+| `{cores}` | Physical CPU cores |
+| `{threads}` | Logical processors (with SMT or Hyper-Threading) |
+| `{pcores}` | Performance cores: the P-cores on Intel hybrid CPUs, every core on AMD and older Intel |
+
+Add `-N` (1 to 9) to subtract, never going below 1: `{pcores-1}` is 7 on a 9800X3D and on a 14900K. Benchmark the default, `{pcores}`, and `{pcores-1}` before you ship one.
+
 ## File formats
 
 Each file in `files` names its `format`. Write keys and values exactly as the file stores them.

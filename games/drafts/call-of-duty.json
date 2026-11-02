@@ -21,7 +21,14 @@
         "{documents}/Call of Duty/players/s.1.0.cod26.txt0"
       ],
       "format": "cod",
-      "settings": []
+      "settings": [
+        {
+          "key": "RendererWorkerCount@0",
+          "value": "{pcores-1}",
+          "label": "Renderer worker threads",
+          "why": "One less than your performance cores, so the game's main thread keeps a core to itself."
+        }
+      ]
     }
   ]
 }

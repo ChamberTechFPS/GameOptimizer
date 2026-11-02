@@ -596,7 +596,7 @@ mod tests {
         cat.validate().unwrap();
         let pc = Pc {
             roots: HashMap::from([("localappdata", local)]),
-            vars: Vars { refresh: 165, width: 2560, height: 1440 },
+            vars: Vars { refresh: 165, width: 2560, height: 1440, ..Vars::default() },
             ..Pc::default()
         };
         let engine = Engine { data: root.join("data"), bundled: root.join("bundled") };

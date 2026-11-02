@@ -19,7 +19,6 @@ const LAUNCHERS: [&str; 7] = ["steam", "epic", "riot", "battlenet", "ea", "ubiso
 const EXTENSIONS: [&str; 6] = ["ini", "txt", "cfg", "vcfg", "txt0", "txt1"];
 /// Settings files with no extension, allowed by exact name.
 const FILE_NAMES: [&str; 1] = ["PROFSAVE_profile"];
-const VARIABLES: [&str; 3] = ["{refresh}", "{width}", "{height}"];
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -122,25 +121,62 @@ pub struct Proof {
     pub method: String,
 }
 
-/// Values filled in from the primary monitor at apply time.
+/// Values filled in at apply time from the primary monitor and the CPU.
 #[derive(Debug, Clone, Copy)]
 pub struct Vars {
     pub refresh: u32,
     pub width: u32,
     pub height: u32,
+    /// Physical cores.
+    pub cores: u32,
+    /// Logical processors (with SMT/Hyper-Threading).
+    pub threads: u32,
+    /// Performance cores: the P-cores on Intel hybrid CPUs, every core elsewhere.
+    pub pcores: u32,
 }
 
 impl Default for Vars {
     fn default() -> Self {
-        Vars { refresh: 60, width: 1920, height: 1080 }
+        Vars { refresh: 60, width: 1920, height: 1080, cores: 8, threads: 16, pcores: 8 }
     }
 }
 
+impl Vars {
+    /// `{name}` or `{name-N}` (N from 1 to 9, never below 1), e.g. `{pcores-1}`.
+    fn get(&self, token: &str) -> Option<u32> {
+        let (name, minus) = match token.split_once('-') {
+            Some((name, n)) => (name, n.parse::<u32>().ok().filter(|n| (1..=9).contains(n))?),
+            None => (token, 0),
+        };
+        let base = match name {
+            "refresh" => self.refresh,
+            "width" => self.width,
+            "height" => self.height,
+            "cores" => self.cores,
+            "threads" => self.threads,
+            "pcores" => self.pcores,
+            _ => return None,
+        };
+        Some(if minus == 0 { base } else { base.saturating_sub(minus).max(1) })
+    }
+}
+
+/// Swap each known `{placeholder}` for this PC's value. Unknown ones stay as written, which
+/// validation rejects.
 pub fn fill(value: &str, vars: &Vars) -> String {
-    value
-        .replace("{refresh}", &vars.refresh.to_string())
-        .replace("{width}", &vars.width.to_string())
-        .replace("{height}", &vars.height.to_string())
+    let mut out = String::new();
+    let mut rest = value;
+    while let Some(start) = rest.find('{') {
+        let Some(len) = rest[start..].find('}') else { break };
+        out.push_str(&rest[..start]);
+        let token = &rest[start..=start + len];
+        match vars.get(&token[1..token.len() - 1]) {
+            Some(n) => out.push_str(&n.to_string()),
+            None => out.push_str(token),
+        }
+        rest = &rest[start + len + 1..];
+    }
+    out + rest
 }
 
 /// Verify the signature, then parse and validate. The only way a catalog gets into the app.
@@ -364,10 +400,6 @@ fn is_key(s: &str, format: Format) -> bool {
 /// the value early: a quote in Valve and convar files, a `//` note in Call of Duty files. INI
 /// values may carry quotes (Overwatch uses them).
 fn is_value(s: &str, format: Format) -> bool {
-    let mut rest = s.to_string();
-    for v in VARIABLES {
-        rest = rest.replace(v, "");
-    }
     let fits = match format {
         Format::Ini | Format::Spaced => true,
         Format::Kv | Format::Convar => !s.contains('"'),
@@ -375,7 +407,7 @@ fn is_value(s: &str, format: Format) -> bool {
         // One JSON scalar: an object, an array, or `1, "x": 2` would add structure, not a value.
         Format::Json => serde_json::from_str::<serde_json::Value>(&fill(s, &Vars::default())).is_ok_and(|v| !v.is_object() && !v.is_array()),
     };
-    fits && !s.chars().any(char::is_control) && !rest.contains(['{', '}'])
+    fits && !s.chars().any(char::is_control) && !fill(s, &Vars::default()).contains(['{', '}'])
 }
 
 fn is_exe(s: &str) -> bool {
@@ -535,10 +567,17 @@ mod tests {
     }
 
     #[test]
-    fn fill_uses_monitor_values() {
-        let v = Vars { refresh: 165, width: 2560, height: 1440 };
+    fn fill_uses_monitor_and_cpu_values() {
+        let v = Vars { refresh: 165, width: 2560, height: 1440, cores: 24, threads: 32, pcores: 8 };
         assert_eq!(fill("{refresh}.000000", &v), "165.000000");
         assert_eq!(fill("{width}x{height}", &v), "2560x1440");
+        assert_eq!(fill("{pcores-1} {cores} {threads}", &v), "7 24 32");
+        let single = Vars { cores: 1, pcores: 1, ..v };
+        assert_eq!(fill("{pcores-1}", &single), "1");
+        for bad in ["{pcores-0}", "{pcores-10}", "{pcores+1}", "{gpu}", "{cores", "x}"] {
+            assert!(!is_value(bad, Format::Ini), "{bad}");
+        }
+        assert!(is_value("{pcores-1}", Format::Cod));
     }
 
     /// Every game file in the repo must load with unknown fields denied and pass validation.

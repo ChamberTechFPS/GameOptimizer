@@ -140,7 +140,7 @@ mod windows {
 
     impl Pc {
         pub fn probe() -> Pc {
-            let mut pc = Pc { vars: display_vars(), running: running_processes(), ..Pc::default() };
+            let mut pc = Pc { vars: cpu_vars(display_vars()), running: running_processes(), ..Pc::default() };
             use windows_sys::Win32::UI::Shell::{FOLDERID_Documents, FOLDERID_LocalAppData, FOLDERID_RoamingAppData, FOLDERID_SavedGames};
             for (token, id) in [
                 ("localappdata", &FOLDERID_LocalAppData),
@@ -235,10 +235,48 @@ mod windows {
             if EnumDisplaySettingsW(std::ptr::null(), ENUM_CURRENT_SETTINGS, &mut mode) != 0 {
                 // 0 or 1 means "hardware default"; treat anything that low as 60 Hz.
                 let refresh = if mode.dmDisplayFrequency < 30 { 60 } else { mode.dmDisplayFrequency };
-                return Vars { refresh, width: mode.dmPelsWidth, height: mode.dmPelsHeight };
+                return Vars { refresh, width: mode.dmPelsWidth, height: mode.dmPelsHeight, ..Vars::default() };
             }
         }
         Vars::default()
+    }
+
+    /// Physical cores, logical processors, and performance cores from the CPU's own topology.
+    fn cpu_vars(vars: Vars) -> Vars {
+        use windows_sys::Win32::System::SystemInformation::{
+            GetLogicalProcessorInformationEx, RelationProcessorCore, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX,
+        };
+        let mut len = 0u32;
+        // SAFETY: the first call only reports the buffer size; the second fills a buffer that
+        // big, and each record is read within it using the size Windows wrote into it.
+        unsafe {
+            GetLogicalProcessorInformationEx(RelationProcessorCore, std::ptr::null_mut(), &mut len);
+            let mut buf = vec![0u8; len as usize];
+            if len == 0 || GetLogicalProcessorInformationEx(RelationProcessorCore, buf.as_mut_ptr().cast(), &mut len) == 0 {
+                return vars;
+            }
+            // (efficiency class, logical processors) per physical core
+            let mut cores: Vec<(u8, u32)> = Vec::new();
+            let mut at = 0usize;
+            while at < len as usize {
+                let rec = &*(buf.as_ptr().add(at) as *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX);
+                let p = &rec.Anonymous.Processor;
+                let masks = std::slice::from_raw_parts(p.GroupMask.as_ptr(), p.GroupCount.max(1) as usize);
+                cores.push((p.EfficiencyClass, masks.iter().map(|m| m.Mask.count_ones()).sum()));
+                at += rec.Size as usize;
+            }
+            // Hybrid CPUs give P-cores a higher efficiency class; everything else reports 0.
+            let top = cores.iter().map(|c| c.0).max().unwrap_or(0);
+            match cores.len() as u32 {
+                0 => vars,
+                n => Vars {
+                    cores: n,
+                    threads: cores.iter().map(|c| c.1).sum(),
+                    pcores: cores.iter().filter(|c| c.0 == top).count() as u32,
+                    ..vars
+                },
+            }
+        }
     }
 
     fn running_processes() -> HashSet<String> {
