@@ -15,7 +15,6 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 
 | Game | Twitch | Kick | Steam | Status |
 |---|---|---|---|---|
-| League of Legends | #2 · 150K | 30.5K | not on Steam | draft (checklist) |
 | Counter-Strike 2 | #6 · 65.0K | 56.7K | #1 · 1,084,013 | shipped in v1 |
 | VALORANT | #7 · 61.7K | 23.5K | not on Steam | shipped in v1 |
 | Fortnite | #8 · 54.5K | 9.7K | not on Steam | shipped in v1 |
@@ -49,6 +48,7 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | Game | Reason |
 |---|---|
 | GTA V, Minecraft, Roblox, World of Warcraft, AION 2 | They don't hinge on frame rate or latency. |
+| League of Legends | Big audience (#2 on Twitch, 150K), but a MOBA that runs well on almost anything. Riot also keeps its settings on its servers, so it could only ever be a checklist. |
 | EA Sports FC 27 | Capped at 60 FPS. |
 | PUBG Mobile, Free Fire, BGMI | Phone games; this app is Windows-only. |
 | Team Fortress 2, War Thunder, Hunt: Showdown 1896 | Smaller audiences or less latency-bound. Add later if you want. |
@@ -57,7 +57,6 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 
 | Draft | Settings file | Confidence | Check |
 |---|---|---|---|
-| league-of-legends | none (checklist) | high | League copies settings from Riot's servers and overwrites local edits ([Riot support](https://support.riotgames.com/riot/performance/reset-configuration-files)). It works like Valorant: fill `manual` with what to set in-game. |
 | dota-2 | `{install}/game/dota/cfg/video.txt` (Valve kv) | high ([Liquipedia](https://liquipedia.net/dota2/Console)) | Leave the VendorID and DeviceID lines alone. Chamber never touches keys you don't list. |
 | arc-raiders | `%LOCALAPPDATA%\PioneerGame\...\WindowsClient\GameUserSettings.ini` | medium ([FandomWire](https://fandomwire.com/want-better-aim-in-arc-raiders-tweak-this-hidden-setting-right-now/)) | Process name unknown: add it from Task Manager. **Menu settings only.** Players got flagged for hidden config tweaks ([MP1st](https://mp1st.com/news/arc-raiders-config-settings-unfair-advantages)). |
 | overwatch-2 | `Documents\Overwatch\Settings\Settings_v0.ini` | medium | Values may be quoted (`Key = "0"`). If they are, write the quotes into `value`; the engine allows them in INI files. |
