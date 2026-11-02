@@ -26,7 +26,7 @@
           "key": "RendererWorkerCount@0",
           "value": "{pcores-1}",
           "label": "Renderer worker threads",
-          "why": "One less than your performance cores, so the game's main thread keeps a core to itself."
+          "why": "One less than your performance cores, so the game's main thread keeps a core to itself. Not in the game's menu."
         }
       ]
     }

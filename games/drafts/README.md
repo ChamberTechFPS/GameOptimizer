@@ -77,7 +77,7 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 
 1. Launch the game once and set every option you care about in its own menu. Then close it.
 2. Open the settings file and find the key for each option. Add an entry for each to `settings`: `key`, `value`, `label`, `values` (display names), and `why` (one plain sentence).
-3. Only use settings the game's menu also exposes. Never hidden ones. That keeps Chamber anti-cheat safe.
+3. Prefer settings the game's menu also exposes. A config-only setting is fine when players commonly change it and the game isn't known to flag it, like `RendererWorkerCount` in Call of Duty. Say in its `why` that it isn't in the menu. Never use one in a game that flags config edits, like ARC Raiders.
 4. Fill in any missing `process` names from Task Manager. They let Chamber refuse to write while the game is running.
 5. Move the file up to `games/`. Then run:
    - `node tools/build-catalog.mjs`

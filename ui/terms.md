@@ -1,6 +1,6 @@
 # Terms of use
 
-Version 1 · Updated 2026-10-28
+Version 2 · Updated 2026-11-02
 
 Chamber Game Optimizer is made by ChamberTech LLC. I'm Campbell, and I run it. These terms are between you and ChamberTech LLC. When you click Accept, you agree to them. If you don't agree, click Decline and the app closes.
 
@@ -16,7 +16,7 @@ The app is free. You can use it on your own PCs. Don't sell it or claim it as yo
 
 You decide which games to optimize. You're responsible for your PC, your game installs, and your game accounts.
 
-The app only changes values that the game's own menu already offers. It injects nothing and leaves nothing running. Still, every publisher sets its own rules and anti-cheat policies, and those can change. I can't promise how any publisher will treat a settings change, so following their rules is up to you.
+The app only changes values in the game's own config files. Most are ones the game's menu already offers. A few only exist in the config file, and the app shows which. It injects nothing and leaves nothing running. Still, every publisher sets its own rules and anti-cheat policies, and those can change. I can't promise how any publisher will treat a settings change, so following their rules is up to you.
 
 ## No warranty
 
