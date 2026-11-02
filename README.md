@@ -52,7 +52,7 @@ Using the app means accepting the [terms of use](ui/terms.md). The app asks on f
 4. Run the tests: `cargo test --manifest-path src-tauri/Cargo.toml`
 5. Commit and push. Players get the new configs the next time they open the app.
 
-CI fails if `catalog.json` is out of date or its signature doesn't match. Never put the private key in the repo or in CI secrets: a key GitHub can reach defeats the point of signing.
+CI fails if `catalog.json` is out of date or its signature doesn't match. Never put the private key in the repo or in CI secrets: a key GitHub can reach defeats the point of signing. Keep an offline backup of the key, on a USB stick or in a password manager. Losing it means a new key and a new app release.
 
 ## Releasing the app
 
