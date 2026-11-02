@@ -1,5 +1,5 @@
 {
-  "version": 1793191480,
+  "version": 1793647552,
   "games": [
     {
       "slug": "cs2",
@@ -216,7 +216,7 @@
             {
               "section": "ScalabilityGroups",
               "key": "sg.ViewDistanceQuality",
-              "value": "2",
+              "value": "3",
               "label": "View distance",
               "values": {
                 "0": "Near",
@@ -224,7 +224,7 @@
                 "2": "Far",
                 "3": "Epic"
               },
-              "why": "Kept far on purpose: players and builds at range keep drawing."
+              "why": "Kept at Epic on purpose: players and builds stay drawn at the longest range."
             },
             {
               "section": "ScalabilityGroups",
@@ -294,7 +294,7 @@
           ]
         }
       ],
-      "rev": "346fc052"
+      "rev": "1fc65c2f"
     },
     {
       "slug": "rocket-league",
