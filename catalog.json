@@ -1,5 +1,5 @@
 {
-  "version": 1793648780,
+  "version": 1793656947,
   "games": [
     {
       "slug": "call-of-duty",
@@ -14,8 +14,7 @@
         ]
       },
       "process": [
-        "cod.exe",
-        "cod26-cod.exe"
+        "cod.exe"
       ],
       "files": [
         {
@@ -62,14 +61,14 @@
             },
             {
               "key": "RendererWorkerCount@0",
-              "value": "{pcores-1}",
+              "value": "{pcores-1,max=7}",
               "label": "Renderer worker threads",
-              "why": "One less than your performance cores, so the game's main thread keeps a core to itself. Not in the game's menu."
+              "why": "One less than your performance cores, so the game's main thread keeps a core to itself. Capped at 7, which tested best on CPUs with more than 8 cores. Not in the game's menu."
             }
           ]
         }
       ],
-      "rev": "fa7ecbd9"
+      "rev": "c2215d47"
     },
     {
       "slug": "cs2",

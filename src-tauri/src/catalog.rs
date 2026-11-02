@@ -142,8 +142,13 @@ impl Default for Vars {
 }
 
 impl Vars {
-    /// `{name}` or `{name-N}` (N from 1 to 9, never below 1), e.g. `{pcores-1}`.
+    /// `{name}` or `{name-N}` (N from 1 to 9, never below 1), e.g. `{pcores-1}`. Either can end in
+    /// `,max=M` (M from 1 to 9999) to cap the result: `{pcores-1,max=7}`.
     fn get(&self, token: &str) -> Option<u32> {
+        let (token, max) = match token.split_once(",max=") {
+            Some((token, m)) => (token, m.parse::<u32>().ok().filter(|m| (1..=9999).contains(m))?),
+            None => (token, u32::MAX),
+        };
         let (name, minus) = match token.split_once('-') {
             Some((name, n)) => (name, n.parse::<u32>().ok().filter(|n| (1..=9).contains(n))?),
             None => (token, 0),
@@ -157,7 +162,7 @@ impl Vars {
             "pcores" => self.pcores,
             _ => return None,
         };
-        Some(if minus == 0 { base } else { base.saturating_sub(minus).max(1) })
+        Some(if minus == 0 { base } else { base.saturating_sub(minus).max(1) }.min(max))
     }
 }
 
@@ -574,7 +579,11 @@ mod tests {
         assert_eq!(fill("{pcores-1} {cores} {threads}", &v), "7 24 32");
         let single = Vars { cores: 1, pcores: 1, ..v };
         assert_eq!(fill("{pcores-1}", &single), "1");
-        for bad in ["{pcores-0}", "{pcores-10}", "{pcores+1}", "{gpu}", "{cores", "x}"] {
+        let big = Vars { cores: 16, pcores: 16, ..v };
+        assert_eq!(fill("{pcores-1,max=7}", &big), "7", "capped");
+        assert_eq!(fill("{pcores-1,max=7}", &Vars { pcores: 6, ..v }), "5", "under the cap");
+        assert_eq!(fill("{threads,max=12}", &v), "12");
+        for bad in ["{pcores-0}", "{pcores-10}", "{pcores+1}", "{gpu}", "{cores", "x}", "{pcores,max=0}", "{pcores,max=x}", "{pcores,max=10000}", "{pcores,min=2}"] {
             assert!(!is_value(bad, Format::Ini), "{bad}");
         }
         assert!(is_value("{pcores-1}", Format::Cod));

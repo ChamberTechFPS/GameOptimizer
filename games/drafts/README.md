@@ -97,6 +97,8 @@ A `value` can hold placeholders that the app fills in for each PC when it applie
 
 Add `-N` (1 to 9) to subtract, never going below 1: `{pcores-1}` is 7 on a 9800X3D and on a 14900K. Benchmark the default, `{pcores}`, and `{pcores-1}` before you ship one.
 
+Add `,max=M` to cap it: `{pcores-1,max=7}` is 7 on a 16-core 9950X and 5 on a 6-core CPU.
+
 ## File formats
 
 Each file in `files` names its `format`. Write keys and values exactly as the file stores them.
