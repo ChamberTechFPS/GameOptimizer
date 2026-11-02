@@ -18,6 +18,7 @@ I optimize gaming PCs at [ChamberTech](https://www.chambertech.net). This app do
 | Game | What changes |
 |---|---|
 | Counter-Strike 2 | 8 video settings in `cs2_video.txt`. Shadows stay high so you can still see enemy shadows. |
+| Call of Duty | 5 settings for Modern Warfare 4: exclusive fullscreen, your monitor's native resolution and refresh rate, and renderer threads matched to your CPU. |
 | Fortnite | 14 settings, including Performance mode, Reflex, and view distance. |
 | Rocket League | 6 effects that hide the ball or cost frames. |
 | Valorant | An in-game checklist. Riot keeps these settings on its servers, so no app can write them. |

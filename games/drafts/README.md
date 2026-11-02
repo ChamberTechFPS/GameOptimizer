@@ -21,7 +21,7 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | Dota 2 | #10 · 46.3K | 22.3K | #2 · 960,326 | draft |
 | ARC Raiders | #11 · 41.3K | – | #14 · 81,817 | draft |
 | Overwatch 2 | #13 · 29.3K | – | #25 · 57,140 | draft |
-| Call of Duty: Modern Warfare 4 | #15 · 27.9K | 17.6K | #9 · 119,808 (Call of Duty app) | draft (call-of-duty) |
+| Call of Duty: Modern Warfare 4 | #15 · 27.9K | 17.6K | #9 · 119,808 (Call of Duty app) | shipping next (call-of-duty) |
 | Deadlock | #17 · 24.8K | – | #5 · 206,050 | draft |
 | WARDOGS | #18 · 24.5K | 5.0K | #7 · 170,247 | draft |
 | Marvel Rivals | #20 · 18.6K | – | #33 · 45,742 | draft |
@@ -29,7 +29,7 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | Escape from Tarkov | #31 · 10.6K | – | #71 · 21,374 | draft |
 | Rocket League | #36 · 9.8K | – | #61 · 25,598 | shipped in v1 |
 | Rainbow Six Siege | #38 · 9.7K | – | #20 · 62,306 | draft |
-| Call of Duty: Warzone | #39 · 9.5K | – | (Call of Duty app) | draft (call-of-duty) |
+| Call of Duty: Warzone | #39 · 9.5K | – | (Call of Duty app) | shipping next (call-of-duty), unconfirmed |
 | PUBG: Battlegrounds | – | – | #3 · 287,432 | draft |
 | Rust | – | 6.8K | #10 · 112,054 | draft |
 | Delta Force | – | – | #34 · 45,677 (peak 106,853) | draft |
@@ -67,7 +67,6 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | pubg | `%LOCALAPPDATA%\TslGame\...\WindowsNoEditor\GameUserSettings.ini` | high | Graphics may sit in one `ScalabilityGroups=(...)` value. If so, the whole bracketed value is one setting. |
 | delta-force | `{install}/Game/DeltaForce/Saved/Config/WindowsClient/GameUserSettings.ini` | medium ([Steam discussion](https://steamcommunity.com/app/2507950/discussions/0/595136892797804254)) | Process name unknown. Check whether an `%LOCALAPPDATA%\DeltaForce` copy wins instead. |
 | the-finals | `%LOCALAPPDATA%\Discovery\...\WindowsClient\GameUserSettings.ini` | low (inferred from Unreal's layout) | Confirm the folder name first. |
-| call-of-duty | `%LOCALAPPDATA%\Activision\Call of Duty\players\s.1.0.cod26.txt0` on Battle.net, `Documents\Call of Duty\players\s.1.0.cod26.txt0` on Steam (cod) | medium (a third-party MW4 script and real Black Ops 6 files) | One draft covers MW4 and Warzone, since both run in the Call of Duty app. I couldn't confirm that Warzone reads this same file. The Steam path is in `also`, so Chamber edits whichever copies exist. That folder split comes from the script and isn't confirmed on a real PC, so check where your copy writes the file. Steam detection uses app 1938090, the shared Call of Duty app. Check that MW4 installs under it. If `s.1.0.cod26.txt1` sits beside the file, add its path to `also` too. Confirm `cod26-cod.exe` in Task Manager while MW4 runs. |
 | rainbow-six-siege | `Documents\My Games\Rainbow Six - Siege\<account id>\GameSettings.ini` (ini) | high (Ubisoft support's forum replies) | The `*` folder covers every account that has played on this PC. Confirm `RainbowSix.exe` in Task Manager, since Siege X may have renamed it. |
 | rust | `{install}/cfg/client.cfg` (convar) | high (real client.cfg files) | The file holds every console variable, not just menu ones. Use only what the options menu sets. Rust writes this file when it quits. |
 | battlefield-6 | `Documents\Battlefield 6\settings\<launcher>\PROFSAVE_profile` (spaced) | medium (guides and a settings tool; nothing official) | The `*` folder matches the launcher folder, like `steam` or `ea`. If your file sits straight in `settings`, take `*/` out of the path. Confirm `bf6.exe` in Task Manager. |

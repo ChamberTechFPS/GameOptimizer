@@ -1,0 +1,69 @@
+{
+  "slug": "call-of-duty",
+  "name": "Call of Duty",
+  "tile": "COD",
+  "launcher": "battlenet",
+  "find": {
+    "steam": 1938090,
+    "uninstall": "Call of Duty",
+    "paths": [
+      "{localappdata}/Activision/Call of Duty"
+    ]
+  },
+  "process": [
+    "cod.exe",
+    "cod26-cod.exe"
+  ],
+  "files": [
+    {
+      "path": "{localappdata}/Activision/Call of Duty/players/s.1.0.cod26.txt0",
+      "also": [
+        "{documents}/Call of Duty/players/s.1.0.cod26.txt0"
+      ],
+      "format": "cod",
+      "settings": [
+        {
+          "key": "DisplayMode@0",
+          "value": "Fullscreen",
+          "label": "Display mode",
+          "values": {
+            "Fullscreen": "Fullscreen exclusive",
+            "Fullscreen borderless window": "Borderless",
+            "Fullscreen borderless extended window": "Borderless extended",
+            "Windowed": "Windowed"
+          },
+          "why": "Exclusive fullscreen gives the game the screen to itself, for the lowest input lag."
+        },
+        {
+          "key": "PreferredDisplayMode@0",
+          "value": "Fullscreen",
+          "label": "Preferred display mode",
+          "values": {
+            "Fullscreen": "Fullscreen exclusive",
+            "Fullscreen borderless window": "Borderless",
+            "Fullscreen borderless extended window": "Borderless extended"
+          },
+          "why": "Keeps the game in exclusive fullscreen when it restarts."
+        },
+        {
+          "key": "Resolution@0",
+          "value": "{width}x{height}",
+          "label": "Resolution",
+          "why": "Your monitor's native resolution, so players stay sharp."
+        },
+        {
+          "key": "RefreshRate@0",
+          "value": "{refresh}.000",
+          "label": "Refresh rate",
+          "why": "Your monitor's full refresh rate, so you see every frame it can show."
+        },
+        {
+          "key": "RendererWorkerCount@0",
+          "value": "{pcores-1}",
+          "label": "Renderer worker threads",
+          "why": "One less than your performance cores, so the game's main thread keeps a core to itself. Not in the game's menu."
+        }
+      ]
+    }
+  ]
+}
