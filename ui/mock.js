@@ -143,13 +143,45 @@
     clear_folder: ({ slug }) => { const g = find(slug); Object.assign(g, { folder: null, found: g.autoFound }); return {}; },
     set_hidden: ({ slug, hidden }) => { find(slug).hidden = hidden; return {}; },
     open_folder: (args) => { console.log("open_folder", args); return {}; },
-    install_catalog: () => ({ status: "current" }),
+    install_catalog: () => {
+      if (location.search.includes("catalog=bad")) {
+        throw new Error("The config catalog failed its signature check, so it wasn't used.");
+      }
+      return { status: "current" };
+    },
   };
 
   const realFetch = window.fetch.bind(window);
   window.fetch = (url, opts) => {
-    if (String(url).startsWith("https://raw.githubusercontent.com/")) return Promise.resolve(new Response("{}"));
-    if (String(url).startsWith("https://api.github.com/")) return Promise.resolve(new Response("", { status: 404 }));
+    const u = String(url);
+    const q = location.search;
+    // hosts.json and terms.md are local files. Everything else in the preview is sample data.
+    if (!u.startsWith("https://")) return realFetch(url, opts);
+    if (u.includes("catalog.json")) {
+      if (q.includes("catalog=down")) return Promise.resolve(new Response("missing", { status: 404 }));
+      return Promise.resolve(new Response(new Uint8Array([123, 125])));
+    }
+    if (u.startsWith("https://api.github.com/")) {
+      if (q.includes("release=down")) return Promise.resolve(new Response("nope", { status: 404 }));
+      const prefix = "https://github.com/ChamberTechFPS/GameOptimizer/releases/tag/";
+      const rel = (tag, extra = {}) => ({ tag_name: tag, html_url: prefix + tag, draft: false, prerelease: false, ...extra });
+      if (q.includes("release=new")) {
+        const body = [
+          rel("v1.0.1-beta.1", { prerelease: true }),
+          rel("v2.0.0", { draft: true }),
+          rel("v9.9.9", { html_url: "https://github.com/ChamberTechFPS/GameOptimizer-evil/releases/tag/v9.9.9" }),
+          rel("v1.0.1"),
+        ];
+        return Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } }));
+      }
+      if (q.includes("release=beta")) {
+        return Promise.resolve(new Response(JSON.stringify([rel("v1.0.1-beta.1", { prerelease: true })]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+      return Promise.resolve(new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } }));
+    }
     return realFetch(url, opts);
   };
 
@@ -163,6 +195,11 @@
     },
     dialog: { open: async (o) => (o?.title?.startsWith("Pick a folder") ? "D:\\Games" : "D:\\Games\\Marvel Rivals") },
     opener: { openUrl: async (url) => console.log("openUrl", url) },
-    app: { getVersion: async () => "1.0.0" },
+    app: {
+      getVersion: async () => {
+        const m = location.search.match(/(?:^|[?&])version=([^&]+)/);
+        return m ? decodeURIComponent(m[1]) : "1.0.0";
+      },
+    },
   };
 })();

@@ -17,14 +17,28 @@ jobs:
         shell: bash
         run: |
           version=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          # v1.0.0-beta.1 is a prerelease of 1.0.0
-          if [ "v$version" != "${GITHUB_REF_NAME%%-*}" ]; then
-            echo "Tag $GITHUB_REF_NAME doesn't match tauri.conf.json version $version"
+          cargo_version=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)
+          # The tag is the version the app reports, prerelease included.
+          # v1.0.0-beta.2 requires "version": "1.0.0-beta.2" in tauri.conf.json.
+          # A beta stamped 1.0.0 cannot tell itself from the stable release, and
+          # GitHub's /releases/latest never lists prereleases.
+          if [ "$cargo_version" != "$version" ]; then
+            echo "src-tauri/Cargo.toml version $cargo_version doesn't match tauri.conf.json version $version"
+            exit 1
+          fi
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME must be exactly v$version (include -beta.N in both)."
             exit 1
           fi
 
       - name: catalog.json matches games/
         run: node tools/build-catalog.mjs --check
+
+      - name: Update hosts are allowed by the CSP
+        run: node tools/check-hosts.mjs
+
+      - name: catalog signature matches the embedded keys
+        run: node tools/verify-catalog.mjs
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -34,8 +48,10 @@ jobs:
       - name: Build the installer
         run: npx --yes @tauri-apps/cli@2 build
 
-      # v1.2.3 -> a draft to review and publish by hand. v1.2.3-beta.1 -> a prerelease for testing,
-      # which GitHub never marks as latest, so the app's update check ignores it.
+      # v1.2.3 -> a draft to review and publish by hand. v1.2.3-beta.1 -> a prerelease.
+      # The app reads the releases list, not /releases/latest, so testers on a -beta
+      # build see newer betas. Stable builds ignore prereleases. Publishing the draft
+      # is what makes a stable release visible.
       - name: Create the release
         shell: bash
         env:

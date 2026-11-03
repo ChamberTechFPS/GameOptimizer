@@ -9,9 +9,20 @@ use sha2::Sha256;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 
-/// RSA-4096 public key (e = 65537) that signs catalog.json. The private key stays offline
+/// RSA public moduli (hex, e = 65537) that may sign `catalog.json`. Private keys stay offline
 /// with the maintainer, so a compromised repo or GitHub account can't ship configs.
-const MODULUS_HEX: &str = "88ac2bb9014f08e292474747b54796cc345f99f54333327c149b6008b7a6490c34e0c50907ff0c5e6e2190d24f4580e4e05b367e5f17127b2922510c40a9fdf9857eec8b57432a70536e787bd0826eba2e652087e59369163c3833513abeddb52e945dd21d845993be36980a368369feb9a05e7d8453076b99df1d8cd5324b2d157c50e75138ed9d1a3efa80c74bc024186e6be75ec841efdff5e073601ec7f0f21958a2ba4769cb3b9bec0f0e846f4dd149d4588b815134ac7bcdd0b2b29b28a2c23f5e384e42521de7d8545ef3458292120e06b77ef05e2d02a8633dd2284cbf774085510f58fd12cd7a24fa86d07b4ac0b5b1055680a8ed7711dc6a7ee7a23e49b76ec046e5ee37a093585364ec93995fa3581385225f99a7abff1fd38d2d4a97ff3a61da828a6279a978cf0df8ca576428003279fb4a0fe56af5b125a08aec195e8a86e796b93b3b73e1adbb0ad46a51db8da2ce6f64bd63d3c377e4d926b2d0128d4b9894383e8276ad19ba53aa92e6b6396398075e8cce9aa6279933fab55ec01a02ce8d086acc5b42d18a749140a8319d6749331aed4c1876a336f55defdaecb05799e589acfb16e1bd9e84c7b66525dcd594724127833e2f1117e54f9e2ab06c3a8781b247980fe530283c606b3526e18eda5b26a90b0d78b82f68b1c9326a717e42ea80176b977e5227038d7cd76570e7de422d33bb1996832ec315";
+///
+/// `CURRENT_MODULUS_HEX` signs new catalogs. `SPARE_MODULUS_HEX` is the next key: leave it
+/// empty until a rotation, paste the new modulus, and ship an app release *before* signing
+/// with the new private key. Installed copies of that release already trust both, so the
+/// rotation does not strand anyone. A spare key is as powerful as the current one.
+/// v1.0.0-beta.1 trusts only the retired RSA-3072 key (its private half was lost) and will
+/// not accept catalogs signed by the key below; those installs need a reinstall.
+const CURRENT_MODULUS_HEX: &str = "88ac2bb9014f08e292474747b54796cc345f99f54333327c149b6008b7a6490c34e0c50907ff0c5e6e2190d24f4580e4e05b367e5f17127b2922510c40a9fdf9857eec8b57432a70536e787bd0826eba2e652087e59369163c3833513abeddb52e945dd21d845993be36980a368369feb9a05e7d8453076b99df1d8cd5324b2d157c50e75138ed9d1a3efa80c74bc024186e6be75ec841efdff5e073601ec7f0f21958a2ba4769cb3b9bec0f0e846f4dd149d4588b815134ac7bcdd0b2b29b28a2c23f5e384e42521de7d8545ef3458292120e06b77ef05e2d02a8633dd2284cbf774085510f58fd12cd7a24fa86d07b4ac0b5b1055680a8ed7711dc6a7ee7a23e49b76ec046e5ee37a093585364ec93995fa3581385225f99a7abff1fd38d2d4a97ff3a61da828a6279a978cf0df8ca576428003279fb4a0fe56af5b125a08aec195e8a86e796b93b3b73e1adbb0ad46a51db8da2ce6f64bd63d3c377e4d926b2d0128d4b9894383e8276ad19ba53aa92e6b6396398075e8cce9aa6279933fab55ec01a02ce8d086acc5b42d18a749140a8319d6749331aed4c1876a336f55defdaecb05799e589acfb16e1bd9e84c7b66525dcd594724127833e2f1117e54f9e2ab06c3a8781b247980fe530283c606b3526e18eda5b26a90b0d78b82f68b1c9326a717e42ea80176b977e5227038d7cd76570e7de422d33bb1996832ec315";
+const SPARE_MODULUS_HEX: &str = "";
+
+/// Every modulus the app accepts, current first. Empty slots are ignored.
+const TRUSTED_MODULI: &[&str] = &[CURRENT_MODULUS_HEX, SPARE_MODULUS_HEX];
 
 /// Path roots a game file may live under. Anything else is rejected.
 pub const TOKENS: [&str; 6] = ["localappdata", "appdata", "documents", "savedgames", "steamuserdata", "install"];
@@ -184,15 +195,25 @@ pub fn fill(value: &str, vars: &Vars) -> String {
     out + rest
 }
 
-/// Verify the signature, then parse and validate. The only way a catalog gets into the app.
+/// Verify the signature against any trusted key, then parse and validate.
+/// The only way a catalog gets into the app.
 pub fn parse_verified(json: &[u8], sig: &[u8]) -> Result<Catalog, String> {
-    if !verify_with(json, sig, MODULUS_HEX) {
+    if !verify_trusted(json, sig) {
         return Err("The config catalog failed its signature check, so it wasn't used.".into());
     }
     let catalog: Catalog =
         serde_json::from_slice(json).map_err(|e| format!("The config catalog is malformed: {e}"))?;
     catalog.validate()?;
     Ok(catalog)
+}
+
+fn verify_trusted(data: &[u8], sig: &[u8]) -> bool {
+    verify_any(data, sig, TRUSTED_MODULI)
+}
+
+/// True when `sig` is a PKCS#1 v1.5 SHA-256 signature of `data` under any non-empty modulus.
+fn verify_any(data: &[u8], sig: &[u8], moduli: &[&str]) -> bool {
+    moduli.iter().any(|modulus| !modulus.is_empty() && verify_with(data, sig, modulus))
 }
 
 fn verify_with(data: &[u8], sig: &[u8], modulus_hex: &str) -> bool {
@@ -424,9 +445,12 @@ mod tests {
     use super::*;
     use std::path::Path;
 
-    // Throwaway 2048-bit test key, generated for these tests only (its private half was discarded).
+    // Throwaway 2048-bit test keys, generated for these tests only (private halves were discarded).
+    // They are not in TRUSTED_MODULI. Key B stands in for a spare key during a rotation.
     const TEST_MODULUS_HEX: &str = "bfe3cc26a01280d1c6fa5e61da8cfb1e16010181c2c71d2f682577a42f4c13f1c66c677dd231a45ea366a822caeac60bfedb759494aa70a973dbf5d26f3ecde5dd032a623cd35ae1e1a6e65771082ec84211c4512bdee2b10c7c09f9b132d931b953790c15206d62ee4f316871b7ff73fb028ca14b26b7fa31ef0bcfb156e5147b42889401667251910624af1aeddb500ffbaa262b28b8a1d84e1247dc1eba595f47ac99a2ad1a9e6aa65ec2759d38ed0d9b59cd05e897acc5c0c4ba70906de01fc77eba6e2486678832de1286dd639d8db35907549f91bfc09d6792f2359d4a8ec592568826b834c6716cd504adeb2f68d63f9eb543fc067ec42d8423d25f0d";
     const TEST_SIG_HEX: &str = "5c824740afe2b56d29d3de1a9d951fc14fab53d80af509b05321704359ed368e04398b4d7c1e16fa358b26ac5bffdad3f947ab846cd6b4ed569c974196229dac2f57d55ce8f10dc6ea34c89176fdeba2852e65f73c64d31356368bf526d5695ec09305faa24db93240ddb5c41cdad8e2060a583a393cbe3044c102714c3ffea8b579139bb4aaa48a5b47f2a24da1a2cb778dfaca6eddff64a7cd7b7fafe5cf81be6e2ceac0591716d16226501b06c74d98e05ec9b616c491d234e9dd3b38c24770b8b4ebe8bc8cd50c4f6f2028b6322f1d44cf112e57ce41b0cae8f2f174ea5d0df3e145303ab827f63079595c5a4c35a6e5ad9d7f0077c038e2bc06baaa1cc8";
+    const TEST_MODULUS_B_HEX: &str = "de457ed6f11c04610ae683cef35d61086f7bd0d8e77742d4c9ac7bca30b8d4d233111c0cf394638bff0907b28f5877307fb50b5f0815b70b666ef9fb56c328a26f55de94d1722580dad6e6a80de9f8d9152b959392753ac9a2e0a60e337e06c7a251d453f2d4adddc9083b4369d5bcde2ff6800689e27093f48b10b1371d84d4f941375c403ff03f20b8894309191b559f885a3be2213bfc4f9f95fd46f2ddc99485226a0519c8cdf2189b247bc7272e7eaa11c5702d237027f1d347e31aaedb2ae44a704f6b6ae6680fcddabe4ce2dcd88df7a14dd2731b098a8da02f33fa492b573a3d8c29e4c3b3dfbd2679682a6accc421941ed1ed5a737c69c24160154f";
+    const TEST_SIG_B_HEX: &str = "d115410420621bd80e58b341e1fbe8766abe514ccb3174cae0ee7cbf3590a7c9491ddb2daff37c51e7fca8f7a63a7e4f49c61e88ef4684d93f04149658bf46a63f13e6b8f625c20285955c5e276942a6a00e3b8a4acef56968a805657991787294118223569f15cd747b123109e48cf443e65ca051940690d7a63485ff90a5e9c50173a2730cd88ec8a920cb78d1014c67af076391e8034ef057ffa8b0dd6c165bb1f0bb18263de12a80018c9a07cae95ac4acdb1023c1204c5ad8eb3a89ea99128741664a056e5eae90d05424b27d19565b47cfecfdc14fb3834050f114295785057b645b8b5c7cb6cd88e9767f8f989cbc53ec57758699efdbeb959b470fb4";
     const TEST_MESSAGE: &[u8] = b"chamber test message";
 
     #[test]
@@ -437,7 +461,33 @@ mod tests {
         let mut bad = sig.clone();
         bad[10] ^= 1;
         assert!(!verify_with(TEST_MESSAGE, &bad, TEST_MODULUS_HEX));
-        assert!(!verify_with(TEST_MESSAGE, &sig, MODULUS_HEX), "test sig must not pass the real key");
+        assert!(!verify_with(TEST_MESSAGE, &sig, CURRENT_MODULUS_HEX), "test sig must not pass the real key");
+        assert!(!verify_trusted(TEST_MESSAGE, &sig));
+    }
+
+    #[test]
+    fn either_trusted_key_verifies_and_a_dropped_key_does_not() {
+        let sig_a = from_hex(TEST_SIG_HEX).unwrap();
+        let sig_b = from_hex(TEST_SIG_B_HEX).unwrap();
+        let both = [TEST_MODULUS_HEX, TEST_MODULUS_B_HEX];
+        assert!(verify_any(TEST_MESSAGE, &sig_a, &both), "current key");
+        assert!(verify_any(TEST_MESSAGE, &sig_b, &both), "spare key, the rotation case");
+        assert!(verify_any(TEST_MESSAGE, &sig_a, &[TEST_MODULUS_HEX, ""]), "empty spare is ignored");
+        assert!(!verify_any(TEST_MESSAGE, &sig_a, &[TEST_MODULUS_B_HEX, ""]), "retired key no longer trusts old catalogs");
+        assert!(!verify_any(TEST_MESSAGE, &sig_b, &[TEST_MODULUS_HEX]), "spare signature before the spare is trusted");
+        assert!(!verify_any(b"chamber test messagE", &sig_a, &both));
+        assert!(!verify_any(TEST_MESSAGE, &sig_a, &["", ""]));
+        assert!(!verify_any(TEST_MESSAGE, &sig_a, &["not-hex", "zzzz"]));
+        assert!(!verify_any(TEST_MESSAGE, &[0u8; 32], &both), "a short signature is not a key");
+        assert!(!verify_trusted(TEST_MESSAGE, &sig_b));
+    }
+
+    #[test]
+    fn trusted_key_list_is_the_current_key_plus_a_spare_slot() {
+        assert_eq!(TRUSTED_MODULI, [CURRENT_MODULUS_HEX, SPARE_MODULUS_HEX]);
+        assert_eq!(CURRENT_MODULUS_HEX.len() * 4, 4096, "current catalog key is RSA-4096");
+        assert!(CURRENT_MODULUS_HEX.chars().all(|c| c.is_ascii_hexdigit()));
+        assert!(SPARE_MODULUS_HEX.is_empty(), "fill SPARE_MODULUS_HEX only when rotating");
     }
 
     #[test]
@@ -618,6 +668,20 @@ mod tests {
         }
         let json = std::fs::read(root.join("catalog.json")).unwrap();
         let sig = std::fs::read(sig_path).unwrap();
-        parse_verified(&json, &sig).unwrap();
+        if let Err(e) = parse_verified(&json, &sig) {
+            panic!(
+                "{e}\n\
+                 The committed catalog does not verify under TRUSTED_MODULI in catalog.rs.\n\
+                 catalog.json was edited after catalog.json.sig was written. Re-sign the current\n\
+                 file locally with the RSA-4096 private key whose public modulus is\n\
+                 CURRENT_MODULUS_HEX (the private key is not in this repo). Do not generate a\n\
+                 new key unless that private key is lost.\n\
+                 \n\
+                 node tools/sign-catalog.mjs <path-to-private-key>\n\
+                 node tools/verify-catalog.mjs\n\
+                 \n\
+                 The openssl commands and the full diagnosis are in RELEASING.md."
+            );
+        }
     }
 }

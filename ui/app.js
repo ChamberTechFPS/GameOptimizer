@@ -3,9 +3,8 @@
 const { invoke } = window.__TAURI__.core;
 const $ = (id) => document.getElementById(id);
 
-const REPO = "ChamberTechFPS/GameOptimizer";
-const CATALOG_URL = `https://raw.githubusercontent.com/${REPO}/main/catalog.json`;
-const RELEASES_API = `https://api.github.com/repos/${REPO}/releases/latest`;
+// Catalog and app-update URLs: ui/hosts.json. Loaded in boot().
+let hosts = null;
 
 const LAUNCHER = { steam: "Steam", epic: "Epic", riot: "Riot", battlenet: "Battle.net", ea: "EA", ubisoft: "Ubisoft", other: "PC" };
 const ORDER = { changed: 0, update: 1, "not-optimized": 2, "launch-once": 3, manual: 4, optimized: 5 };
@@ -554,18 +553,47 @@ function setChip(state, text, detail = "") {
   $("catalog-chip").title = detail;
 }
 
+function hostOf(url) {
+  try { return new URL(url).host; } catch { return "the update server"; }
+}
+
+// A 404 from GitHub is what a private repo returns to people who aren't signed in.
+function httpFailure(url, status) {
+  const host = hostOf(url);
+  return status === 404
+    ? `${host} answered 404. A private GitHub repo does that for anyone who isn't signed in, and so does a missing file.`
+    : `${host} answered ${status}.`;
+}
+
+async function loadHosts() {
+  const r = await fetch("hosts.json");
+  if (!r.ok) throw new Error("hosts.json is missing from the app.");
+  const h = await r.json();
+  for (const key of ["catalogUrl", "catalogSigUrl", "releasesUrl", "releasePagePrefix"]) {
+    let url;
+    try { url = new URL(h[key]); } catch { throw new Error(`${key} is not a URL.`); }
+    if (url.protocol !== "https:") throw new Error(`${key} must use https.`);
+  }
+  if (!h.catalogUrl.endsWith("/catalog.json") || !h.catalogSigUrl.endsWith("/catalog.json.sig")) {
+    throw new Error("The catalog host must serve catalog.json and catalog.json.sig.");
+  }
+  if (!h.releasePagePrefix.endsWith("/")) throw new Error("releasePagePrefix must end with /.");
+  if (typeof h.includePrereleases !== "boolean") throw new Error("includePrereleases must be true or false.");
+  return h;
+}
+
 // The webview downloads; the engine verifies the signature before anything is used.
 async function refreshCatalog() {
   setChip("checking", "Checking for new configs…");
   let json, sig;
   try {
-    [json, sig] = await Promise.all([CATALOG_URL, `${CATALOG_URL}.sig`].map(async (url) => {
+    [json, sig] = await Promise.all([hosts.catalogUrl, hosts.catalogSigUrl].map(async (url) => {
       const r = await fetch(url, { cache: "no-store" });
-      if (!r.ok) throw new Error(`GitHub answered ${r.status}`);
+      if (!r.ok) throw new Error(httpFailure(url, r.status));
       return Array.from(new Uint8Array(await r.arrayBuffer()));
     }));
   } catch (e) {
-    setChip("saved", "Using saved configs", `Couldn't reach GitHub: ${errText(e)}`);
+    setChip("error", "Couldn't check for new configs", `${errText(e)} Using the configs already on this PC.`);
     return;
   }
   try {
@@ -573,32 +601,50 @@ async function refreshCatalog() {
     if (r.status === "updated") await scan();
     setChip("fresh", r.status === "updated" ? "New configs downloaded" : "Configs up to date");
   } catch (e) {
-    setChip("saved", "Using saved configs", errText(e));
+    setChip("error", "New configs were rejected", `${errText(e)} Using the configs already on this PC.`);
   }
 }
 
-function newer(a, b) {
-  const pa = a.split(".").map(Number);
-  const pb = b.split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
-  }
-  return false;
+function showUpdateError(detail) {
+  const chip = $("update-chip");
+  chip.hidden = false;
+  chip.disabled = true;
+  chip.dataset.state = "error";
+  chip.classList.remove("chip-violet");
+  chip.textContent = "Couldn't check for updates";
+  chip.title = detail;
+  chip.onclick = null;
 }
 
 async function checkAppUpdate() {
+  const chip = $("update-chip");
   try {
-    const r = await fetch(RELEASES_API, { headers: { Accept: "application/vnd.github+json" } });
-    if (!r.ok) return;
-    const rel = await r.json();
-    const latest = String(rel.tag_name ?? "").replace(/^v/, "");
-    if (!newer(latest, appVersion) || !String(rel.html_url).startsWith(`https://github.com/${REPO}/`)) return;
-    const chip = $("update-chip");
-    chip.textContent = `v${latest} available`;
+    const r = await fetch(hosts.releasesUrl, {
+      cache: "no-store",
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!r.ok) {
+      showUpdateError(httpFailure(hosts.releasesUrl, r.status));
+      return;
+    }
+    const choice = ChamberUpdates.chooseRelease(await r.json(), appVersion, hosts);
+    if (choice.status === "error") {
+      showUpdateError(choice.detail);
+      return;
+    }
+    if (choice.status !== "update") {
+      chip.hidden = true;
+      return;
+    }
     chip.hidden = false;
-    chip.onclick = () => openUrl(rel.html_url);
-  } catch {
-    // Offline: the configs chip already says so
+    chip.disabled = false;
+    chip.dataset.state = "available";
+    chip.classList.add("chip-violet");
+    chip.textContent = `v${choice.version} available`;
+    chip.title = "Open the release page";
+    chip.onclick = () => openUrl(choice.url);
+  } catch (e) {
+    showUpdateError(errText(e));
   }
 }
 
@@ -621,6 +667,13 @@ $("drawer").addEventListener("close", () => (drawerSlug = null));
   await scan();
   const terms = await loadTerms();
   if (view.terms < terms.version) await welcome(terms);
+  try {
+    hosts = await loadHosts();
+  } catch (e) {
+    setChip("error", "Couldn't check for new configs", errText(e));
+    showUpdateError(errText(e));
+    return;
+  }
   refreshCatalog();
   checkAppUpdate();
 })();

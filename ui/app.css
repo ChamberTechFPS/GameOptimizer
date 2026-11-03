@@ -107,8 +107,12 @@ body.busy .btn { pointer-events: none; opacity: 0.6; }
 .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--violet); }
 .chip[data-state="fresh"] .dot { background: var(--ok); }
 .chip[data-state="saved"] .dot { background: var(--warn); }
+.chip[data-state="error"] { color: var(--bad); border-color: rgba(248, 113, 113, 0.55); }
+.chip[data-state="error"] .dot { background: var(--bad); }
 .chip-violet { border-color: var(--violet); color: var(--violet-soft); cursor: pointer; }
 .chip-violet:hover { background: var(--violet-tint); }
+button.chip:disabled { cursor: default; opacity: 1; }
+button.chip[data-state="error"]:hover { background: var(--card); }
 
 /* Hero: the one place the carbon + corner glow from the logo shows up big */
 main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 24px; }

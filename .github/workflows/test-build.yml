@@ -16,6 +16,9 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: catalog signature matches the embedded keys
+        run: node tools/verify-catalog.mjs
+
       - name: Build the installer
         run: npx --yes @tauri-apps/cli@2 build
 

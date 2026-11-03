@@ -80,8 +80,8 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 4. Fill in any missing `process` names from Task Manager. They let Chamber refuse to write while the game is running.
 5. Move the file up to `games/`. Then run:
    - `node tools/build-catalog.mjs`
+   - `node tools/sign-catalog.mjs <path-to-private-key>`
    - `cargo test --manifest-path src-tauri/Cargo.toml` (checks every field)
-   - the sign command it prints
 6. Benchmark it and add `proof` (rig, avg and 1% lows before and after, method). Without it, the app shows no performance claim.
 
 ## Values that depend on the PC
