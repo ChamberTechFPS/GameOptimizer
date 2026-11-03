@@ -52,7 +52,27 @@ function tile(g, extra = "") {
 }
 
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const errText = (e) => String(e?.message ?? e).split("\n")[0].slice(0, 200);
+const errText = (e) => String(e?.message ?? e).split("\n")[0].slice(0, 400);
+
+// Same sentence as detect::close_before_applying. Scan and the running poll send it as
+// applyBlock; this rebuilds it only when an apply error comes back wrapped.
+function closeBeforeApplying(name) {
+  return `Close ${name} before applying — the config can't be applied while the game is running.`;
+}
+
+function blocked(g) {
+  return !!(g.running && actionable(g));
+}
+
+function blockText(g, raw = "") {
+  const canonical = closeBeforeApplying(g.name);
+  if (!raw) return g.applyBlock || (blocked(g) ? canonical : "");
+  if (raw === canonical) return raw;
+  const start = raw.indexOf("Close ");
+  if (start >= 0 && raw.includes("can't be applied while the game is running")) return raw.slice(start);
+  if (raw.includes("while the game is running")) return canonical;
+  return "";
+}
 const dateText = (secs) => new Date(secs * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const actionable = (g) => ["not-optimized", "changed", "update"].includes(g.status);
 const where = (g) => [LAUNCHER[g.launcher] ?? g.launcher, g.location].filter(Boolean).join(" · ");
@@ -90,7 +110,6 @@ function proofLine(g) {
 }
 
 function noteFor(g) {
-  if (g.running && actionable(g)) return [`Close ${g.name} to apply`, "warn-text"];
   switch (g.status) {
     case "optimized": return [g.appliedAt ? `Applied ${dateText(g.appliedAt)}` : "Already matches", ""];
     case "changed": return ["Changed since you applied", ""];
@@ -106,6 +125,23 @@ function badge(g) {
   const b = el("span", `badge ${tone}`.trim());
   if (ic) b.append(icon(ic));
   b.append(label);
+  return b;
+}
+
+function runningWarning(g) {
+  const text = blockText(g);
+  if (!blocked(g) || !text) return null;
+  const note = el("p", "note running-warn");
+  note.append(icon("alert"), el("span", null, text));
+  return note;
+}
+
+function applyButton(label, cls, g) {
+  const b = button(label, cls, () => apply(g));
+  if (blocked(g)) {
+    b.disabled = true;
+    b.title = blockText(g);
+  }
   return b;
 }
 
@@ -142,11 +178,12 @@ function card(g) {
   } else {
     actions.append(button("Details", "btn-ghost", () => openDrawer(g.slug)));
     if (g.status === "optimized" && g.appliedAt) actions.append(revertButton(g));
-    if (g.status === "changed") actions.append(button("Re-apply", "btn-outline", () => apply(g)));
-    if (g.status === "update") actions.append(button("Apply update", "btn-outline", () => apply(g)));
-    if (g.status === "not-optimized") actions.append(button("Optimize", "btn-outline", () => apply(g)));
+    if (g.status === "changed") actions.append(applyButton("Re-apply", "btn-outline", g));
+    if (g.status === "update") actions.append(applyButton("Apply update", "btn-outline", g));
+    if (g.status === "not-optimized") actions.append(applyButton("Optimize", "btn-outline", g));
   }
-  c.append(head, status, actions);
+  const warn = runningWarning(g);
+  c.append(head, status, ...(warn ? [warn] : []), actions);
   return c;
 }
 
@@ -261,11 +298,8 @@ function renderDrawer() {
     });
     body.append(note, settingsTable(rows, ["Setting", "Set to"]));
   } else {
-    if (g.running && actionable(g)) {
-      const note = el("p", "note warn-text");
-      note.append(icon("alert"), `Close ${g.name} to apply. Its settings file can't be changed while it runs.`);
-      body.append(note);
-    }
+    const warn = runningWarning(g);
+    if (warn) body.append(warn);
     if (g.status === "launch-once") {
       body.append(el("p", "note", `Launch ${g.name} once so it creates its settings file, then rescan.`));
     }
@@ -302,13 +336,13 @@ function renderDrawer() {
   const openBtn = button("Open folder", "btn-ghost", () => openFolder(g, "config"), "folder");
   switch (g.status) {
     case "not-optimized":
-      foot.append(openBtn, button(`Optimize ${plural(g.differ, "setting")}`, "btn-primary", () => apply(g)));
+      foot.append(openBtn, applyButton(`Optimize ${plural(g.differ, "setting")}`, "btn-primary", g));
       break;
     case "changed":
-      foot.append(openBtn, revertButton(g, `Revert all ${g.total}`), button(`Re-apply ${g.differ}`, "btn-primary", () => apply(g)));
+      foot.append(openBtn, revertButton(g, `Revert all ${g.total}`), applyButton(`Re-apply ${g.differ}`, "btn-primary", g));
       break;
     case "update":
-      foot.append(openBtn, revertButton(g), button("Apply update", "btn-primary", () => apply(g)));
+      foot.append(openBtn, revertButton(g), applyButton("Apply update", "btn-primary", g));
       break;
     case "optimized":
       foot.append(openBtn);
@@ -455,6 +489,7 @@ async function run(task) {
 }
 
 async function scan() {
+  runningEpoch++;
   try {
     view = await invoke("scan");
   } catch (e) {
@@ -464,27 +499,91 @@ async function scan() {
   rerender();
 }
 
+// Process check only, every few seconds and whenever the window is focused again.
+// A full scan re-reads every config file; this just asks which exes are open.
+let runningEpoch = 0;
+let runningInFlight = false;
+const RUNNING_POLL_MS = 3000;
+
+async function refreshRunning({ force = false } = {}) {
+  if ((busy && !force) || document.hidden || runningInFlight || !view.games.length) return;
+  runningInFlight = true;
+  const epoch = runningEpoch;
+  try {
+    const r = await invoke("running");
+    if (epoch !== runningEpoch || (busy && !force)) return;
+    const blocks = new Map((r.running ?? []).map((b) => [b.slug, b.message]));
+    let changed = false;
+    for (const g of view.games) {
+      const message = blocks.has(g.slug) ? blocks.get(g.slug) : null;
+      const next = message != null;
+      if (!!g.running !== next || (g.applyBlock ?? null) !== message) {
+        g.running = next;
+        g.applyBlock = message;
+        changed = true;
+      }
+    }
+    if (changed) rerender();
+  } catch {
+    // The next tick tries again. Apply still refuses on the engine side.
+  } finally {
+    runningInFlight = false;
+  }
+}
+
+function watchRunning() {
+  const tick = () => refreshRunning();
+  document.addEventListener("visibilitychange", tick);
+  window.addEventListener("focus", tick);
+  setInterval(tick, RUNNING_POLL_MS);
+}
+
+function showBlocked(g, raw) {
+  const text = blockText(g, raw);
+  if (!text) return false;
+  g.running = true;
+  g.applyBlock = text;
+  rerender();
+  toast(text, "error");
+  return true;
+}
+
 const apply = (g) => run(async () => {
+  await refreshRunning({ force: true });
+  if (blocked(g)) {
+    showBlocked(g);
+    return;
+  }
   try {
     const r = await invoke("apply", { slug: g.slug });
     toast(`Optimized ${g.name}. ${plural(r.changed, "setting")} changed.`, "ok");
   } catch (e) {
-    toast(errText(e), "error");
+    const msg = errText(e);
+    if (!showBlocked(g, msg)) toast(msg, "error");
   }
   await scan();
 });
 
 const optimizeAll = () => run(async () => {
+  await refreshRunning({ force: true });
   const targets = view.games.filter((g) => !g.hidden && g.found && actionable(g));
   const skipped = [];
   let done = 0;
   for (const g of targets) {
-    if (g.running) { skipped.push(`${g.name} is running`); continue; }
+    if (g.running) { skipped.push(blockText(g) || closeBeforeApplying(g.name)); continue; }
     try {
       await invoke("apply", { slug: g.slug });
       done++;
     } catch (e) {
-      skipped.push(`${g.name}: ${errText(e)}`);
+      const msg = errText(e);
+      const text = blockText(g, msg);
+      if (text) {
+        g.running = true;
+        g.applyBlock = text;
+        skipped.push(text);
+      } else {
+        skipped.push(`${g.name}: ${msg}`);
+      }
     }
   }
   await scan();
@@ -619,6 +718,7 @@ $("drawer").addEventListener("close", () => (drawerSlug = null));
   appVersion = await window.__TAURI__.app.getVersion().catch(() => appVersion);
   $("version").textContent = appVersion;
   await scan();
+  watchRunning();
   const terms = await loadTerms();
   if (view.terms < terms.version) await welcome(terms);
   refreshCatalog();

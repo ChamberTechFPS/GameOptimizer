@@ -58,6 +58,15 @@ async fn apply(app: State<'_, App>, slug: String) -> Reply {
     with(&app, |e| Ok(json!({ "changed": e.apply(&e.catalog()?, &Pc::probe(), &slug)? })))
 }
 
+/// Games whose exe is running. Process names come from the catalog; this only snapshots processes.
+#[tauri::command]
+async fn running(app: State<'_, App>) -> Reply {
+    let games = with(&app, |e| Ok(e.catalog()?.games))?;
+    let pc = Pc { running: detect::running_exes(), ..Pc::default() };
+    let running = pc.apply_blocks(&games).into_iter().map(|b| json!({ "slug": b.slug, "message": b.message })).collect::<Vec<_>>();
+    Ok(json!({ "running": running }))
+}
+
 #[tauri::command]
 async fn revert(app: State<'_, App>, slug: String) -> Reply {
     with(&app, |e| e.revert(&e.catalog()?, &Pc::probe(), &slug).map(|_| json!({})))
@@ -104,6 +113,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             scan,
             apply,
+            running,
             revert,
             set_folder,
             clear_folder,
