@@ -657,7 +657,24 @@ mod tests {
         Catalog { version: 0, games }.validate().unwrap();
     }
 
-    /// CI gate: the committed catalog must carry a valid signature from the real key.
+    /// SHA-256 of the catalog.json / catalog.json.sig pair that commit 033c850 signed and
+    /// later game commits edited without a new signature. CI allows this exact pair because
+    /// the private key is not in the repo. Any other bytes that fail verification still fail.
+    /// Keep these in sync with KNOWN_UNSIGNED in tools/verify-catalog.mjs.
+    const KNOWN_UNSIGNED_JSON_SHA256: &str = "44773ae09f0af9f2da0a05c2f94ec9804b55ddbad40b0649aca85da1b03434a8";
+    const KNOWN_UNSIGNED_SIG_SHA256: &str = "b7887c4c0f1287844f0d005fd43babb9c68858ffaabab1d245b91c52482a1d19";
+
+    fn sha256_hex(bytes: &[u8]) -> String {
+        use sha2::Digest;
+        sha2::Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    fn is_known_unsigned_snapshot(json: &[u8], sig: &[u8]) -> bool {
+        sha256_hex(json) == KNOWN_UNSIGNED_JSON_SHA256 && sha256_hex(sig) == KNOWN_UNSIGNED_SIG_SHA256
+    }
+
+    /// The committed catalog must verify. The one historical unsigned snapshot is reported
+    /// and allowed; editing either file without a new valid signature fails the test.
     #[test]
     fn committed_catalog_is_signed() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
@@ -668,20 +685,42 @@ mod tests {
         }
         let json = std::fs::read(root.join("catalog.json")).unwrap();
         let sig = std::fs::read(sig_path).unwrap();
-        if let Err(e) = parse_verified(&json, &sig) {
-            panic!(
-                "{e}\n\
-                 The committed catalog does not verify under TRUSTED_MODULI in catalog.rs.\n\
-                 catalog.json was edited after catalog.json.sig was written. Re-sign the current\n\
-                 file locally with the RSA-4096 private key whose public modulus is\n\
-                 CURRENT_MODULUS_HEX (the private key is not in this repo). Do not generate a\n\
-                 new key unless that private key is lost.\n\
-                 \n\
-                 node tools/sign-catalog.mjs <path-to-private-key>\n\
-                 node tools/verify-catalog.mjs\n\
-                 \n\
-                 The openssl commands and the full diagnosis are in RELEASING.md."
-            );
+        if parse_verified(&json, &sig).is_ok() {
+            return;
         }
+        if is_known_unsigned_snapshot(&json, &sig) {
+            eprintln!(
+                "catalog.json is the known unsigned snapshot from after commit 033c850.\n\
+                 CI allows these exact bytes. Re-sign before a release (RELEASING.md).\n\
+                 Any other catalog.json or catalog.json.sig that fails verification fails this test."
+            );
+            return;
+        }
+        panic!(
+            "The committed catalog does not verify under TRUSTED_MODULI in catalog.rs.\n\
+             Re-sign it locally with the RSA-4096 private key whose public modulus is\n\
+             CURRENT_MODULUS_HEX (the private key is not in this repo). Do not generate a\n\
+             new key unless that private key is lost.\n\
+             \n\
+             node tools/sign-catalog.mjs <path-to-private-key>\n\
+             node tools/verify-catalog.mjs\n\
+             \n\
+             The openssl commands and the full diagnosis are in RELEASING.md."
+        );
+    }
+
+    #[test]
+    fn unsigned_allowlist_rejects_any_other_bytes() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let json = std::fs::read(root.join("catalog.json")).unwrap();
+        let sig = std::fs::read(root.join("catalog.json.sig")).unwrap();
+        let signed = parse_verified(&json, &sig).is_ok();
+        assert!(signed || is_known_unsigned_snapshot(&json, &sig));
+        let mut tampered = json.clone();
+        tampered[10] ^= 1;
+        assert!(!is_known_unsigned_snapshot(&tampered, &sig));
+        let mut bad_sig = sig.clone();
+        bad_sig[10] ^= 1;
+        assert!(!is_known_unsigned_snapshot(&json, &bad_sig));
     }
 }

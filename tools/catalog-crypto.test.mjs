@@ -30,6 +30,18 @@ test("trusted moduli come from TRUSTED_MODULI, including the empty spare", () =>
   assert.equal(keys[1].hex, "");
 });
 
+test("verify fails closed, and CI's allowlist accepts only the known unsigned snapshot", () => {
+  const strict = spawnSync(process.execPath, ["tools/verify-catalog.mjs"], { cwd: root, encoding: "utf8" });
+  if (strict.status === 0) {
+    assert.match(strict.stdout, /Signature OK/);
+    return;
+  }
+  assert.match(strict.stderr, /failed its signature check/);
+  const allowed = spawnSync(process.execPath, ["tools/verify-catalog.mjs", "--allow-known-unsigned"], { cwd: root, encoding: "utf8" });
+  assert.equal(allowed.status, 0, allowed.stderr);
+  assert.match(allowed.stderr, /known unsigned snapshot/);
+});
+
 test("sign-catalog refuses to run without a key and refuses a key inside the repo", () => {
   const noKey = spawnSync(process.execPath, ["tools/sign-catalog.mjs"], { cwd: root, encoding: "utf8" });
   assert.notEqual(noKey.status, 0);

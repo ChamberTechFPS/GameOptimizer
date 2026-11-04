@@ -4,7 +4,7 @@ The app only applies a catalog that verifies against a public key compiled into 
 
 ## Still to do before players can get configs
 
-1. **Re-sign `catalog.json`.** The signature in git does not match the current file. Until you sign it, `cargo test` fails `catalog::tests::committed_catalog_is_signed`, CI stays red, and a built app has no catalog it will load.
+1. **Re-sign `catalog.json`.** The signature in git does not match the current file. CI allows this one snapshot (those exact bytes, and no others) so the branch can land without the private key. `release.yml` and `test-build.yml` do not. A built app has no catalog it will load until you sign. Changing `catalog.json` or `catalog.json.sig` without a valid signature fails CI again.
 2. **Create a public catalog host** and publish `catalog.json` and `catalog.json.sig` there. The default URL is a repo that does not exist yet. Do not create it from a bot; create it yourself.
 3. **Make app releases reachable.** Update checks call `api.github.com` for this repo. That 404s while the repo is private. The app now says so, instead of failing silently. Publish the repo, or point `releasesUrl` at a public repo that actually has the releases.
 
