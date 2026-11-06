@@ -33,8 +33,8 @@
       <strong>Game optimizer</strong>
       <span class="meta">by ChamberTech · v<span id="version">1.0.0</span></span>
     </div>
-    <span id="catalog-chip" class="chip" data-state="checking"><span class="dot"></span><span id="catalog-text">Checking for new configs…</span></span>
-    <button id="update-chip" class="chip chip-violet" type="button" hidden></button>
+    <span id="catalog-chip" class="chip" data-state="checking" aria-live="polite"><span class="dot"></span><span id="catalog-text">Checking for new configs…</span></span>
+    <button id="update-chip" class="chip chip-violet" type="button" hidden aria-live="polite"></button>
     <button id="library-btn" class="btn" type="button"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg>Library</button>
     <button id="rescan-btn" class="btn btn-ghost btn-icon" type="button" aria-label="Rescan" title="Rescan"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button>
   </header>
@@ -79,11 +79,30 @@
       </div>
       <button class="btn btn-ghost btn-icon" type="button" data-close aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
     </div>
-    <ul id="sheet-list" class="sheet-list"></ul>
+    <div class="sheet-list">
+      <h3 class="libs-title">Game folders</h3>
+      <p class="meta">I look through each one, including each launcher's own folders inside it.</p>
+      <div class="libs"></div>
+      <h3 class="libs-title">Games</h3>
+      <ul id="sheet-list"></ul>
+    </div>
+  </dialog>
+
+  <!-- First launch: accept the terms, then add game folders. Can't be dismissed until accepted. -->
+  <dialog id="welcome" class="sheet welcome" aria-labelledby="welcome-title">
+    <div class="sheet-head">
+      <div>
+        <h2 id="welcome-title"></h2>
+        <p id="welcome-sub" class="meta"></p>
+      </div>
+    </div>
+    <div id="welcome-body" class="sheet-list welcome-body"></div>
+    <div id="welcome-foot" class="drawer-foot"></div>
   </dialog>
 
   <div id="toast" class="toast" role="status" hidden></div>
 
+  <script src="updates.js"></script>
   <script src="mock.js"></script>
   <script src="app.js"></script>
 </body>

@@ -3,3 +3,7 @@
 .DS_Store
 .claude/
 .impeccable/
+
+# Catalog signing private key. Lives offline; never commit signing/ or *.key.
+signing/
+*.key

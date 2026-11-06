@@ -3,7 +3,7 @@
   "name": "Fortnite",
   "tile": "FN",
   "launcher": "epic",
-  "find": { "epic": "Fortnite", "paths": ["{localappdata}/FortniteGame"] },
+  "find": { "epic": "Fortnite", "paths": ["{localappdata}/FortniteGame"], "exe": "FortniteGame/Binaries/Win64/FortniteClient-Win64-Shipping.exe" },
   "process": ["FortniteClient-Win64-Shipping.exe"],
   "files": [
     {
@@ -18,7 +18,7 @@
         { "section": "/Script/FortniteGame.FortGameUserSettings", "key": "bMotionBlur", "value": "False", "label": "Motion blur", "values": { "False": "Off", "True": "On" }, "why": "Blur hides the movement you need to track." },
         { "section": "/Script/FortniteGame.FortGameUserSettings", "key": "bRayTracing", "value": "False", "label": "Ray tracing", "values": { "False": "Off", "True": "On" }, "why": "A large frame cost with no competitive value." },
         { "section": "ScalabilityGroups", "key": "sg.ResolutionQuality", "value": "100", "label": "3D resolution", "values": { "100": "100%" }, "why": "Anything below your native resolution makes players blurrier." },
-        { "section": "ScalabilityGroups", "key": "sg.ViewDistanceQuality", "value": "2", "label": "View distance", "values": { "0": "Near", "1": "Medium", "2": "Far", "3": "Epic" }, "why": "Kept far on purpose: players and builds at range keep drawing." },
+        { "section": "ScalabilityGroups", "key": "sg.ViewDistanceQuality", "value": "3", "label": "View distance", "values": { "0": "Near", "1": "Medium", "2": "Far", "3": "Epic" }, "why": "Kept at Epic on purpose: players and builds stay drawn at the longest range." },
         { "section": "ScalabilityGroups", "key": "sg.ShadowQuality", "value": "0", "label": "Shadows", "values": { "0": "Off", "1": "Medium", "2": "High", "3": "Epic" }, "why": "Shadows redraw the scene from each light. Off skips that work." },
         { "section": "ScalabilityGroups", "key": "sg.AntiAliasingQuality", "value": "0", "label": "Anti-aliasing", "values": { "0": "Off", "1": "Medium", "2": "High", "3": "Epic" }, "why": "Edge smoothing blurs distant players." },
         { "section": "ScalabilityGroups", "key": "sg.PostProcessQuality", "value": "0", "label": "Post processing", "values": { "0": "Low", "1": "Medium", "2": "High", "3": "Epic" }, "why": "Removes bloom and haze layered over the scene." },

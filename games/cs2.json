@@ -3,7 +3,7 @@
   "name": "Counter-Strike 2",
   "tile": "CS",
   "launcher": "steam",
-  "find": { "steam": 730 },
+  "find": { "steam": 730, "exe": "game/bin/win64/cs2.exe" },
   "process": ["cs2.exe"],
   "files": [
     {

@@ -3,7 +3,7 @@
   "name": "Valorant",
   "tile": "VA",
   "launcher": "riot",
-  "find": { "uninstall": "VALORANT", "paths": ["{localappdata}/VALORANT"] },
+  "find": { "uninstall": "VALORANT", "paths": ["{localappdata}/VALORANT"], "exe": "live/VALORANT.exe" },
   "process": ["VALORANT-Win64-Shipping.exe"],
   "manual": [
     { "label": "Display mode", "value": "Fullscreen", "why": "Exclusive fullscreen has the lowest input latency." },

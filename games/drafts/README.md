@@ -15,14 +15,13 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 
 | Game | Twitch | Kick | Steam | Status |
 |---|---|---|---|---|
-| League of Legends | #2 · 150K | 30.5K | not on Steam | draft (checklist) |
 | Counter-Strike 2 | #6 · 65.0K | 56.7K | #1 · 1,084,013 | shipped in v1 |
 | VALORANT | #7 · 61.7K | 23.5K | not on Steam | shipped in v1 |
 | Fortnite | #8 · 54.5K | 9.7K | not on Steam | shipped in v1 |
 | Dota 2 | #10 · 46.3K | 22.3K | #2 · 960,326 | draft |
 | ARC Raiders | #11 · 41.3K | – | #14 · 81,817 | draft |
 | Overwatch 2 | #13 · 29.3K | – | #25 · 57,140 | draft |
-| Call of Duty: Modern Warfare 4 | #15 · 27.9K | 17.6K | #9 · 119,808 (Call of Duty app) | draft (call-of-duty) |
+| Call of Duty: Modern Warfare 4 | #15 · 27.9K | 17.6K | #9 · 119,808 (Call of Duty app) | shipping next (call-of-duty) |
 | Deadlock | #17 · 24.8K | – | #5 · 206,050 | draft |
 | WARDOGS | #18 · 24.5K | 5.0K | #7 · 170,247 | draft |
 | Marvel Rivals | #20 · 18.6K | – | #33 · 45,742 | draft |
@@ -30,7 +29,7 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | Escape from Tarkov | #31 · 10.6K | – | #71 · 21,374 | draft |
 | Rocket League | #36 · 9.8K | – | #61 · 25,598 | shipped in v1 |
 | Rainbow Six Siege | #38 · 9.7K | – | #20 · 62,306 | draft |
-| Call of Duty: Warzone | #39 · 9.5K | – | (Call of Duty app) | draft (call-of-duty) |
+| Call of Duty: Warzone | #39 · 9.5K | – | (Call of Duty app) | shipping next (call-of-duty), unconfirmed |
 | PUBG: Battlegrounds | – | – | #3 · 287,432 | draft |
 | Rust | – | 6.8K | #10 · 112,054 | draft |
 | Delta Force | – | – | #34 · 45,677 (peak 106,853) | draft |
@@ -49,6 +48,7 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | Game | Reason |
 |---|---|
 | GTA V, Minecraft, Roblox, World of Warcraft, AION 2 | They don't hinge on frame rate or latency. |
+| League of Legends | Big audience (#2 on Twitch, 150K), but a MOBA that runs well on almost anything. Riot also keeps its settings on its servers, so it could only ever be a checklist. |
 | EA Sports FC 27 | Capped at 60 FPS. |
 | PUBG Mobile, Free Fire, BGMI | Phone games; this app is Windows-only. |
 | Team Fortress 2, War Thunder, Hunt: Showdown 1896 | Smaller audiences or less latency-bound. Add later if you want. |
@@ -57,7 +57,6 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 
 | Draft | Settings file | Confidence | Check |
 |---|---|---|---|
-| league-of-legends | none (checklist) | high | League copies settings from Riot's servers and overwrites local edits ([Riot support](https://support.riotgames.com/riot/performance/reset-configuration-files)). It works like Valorant: fill `manual` with what to set in-game. |
 | dota-2 | `{install}/game/dota/cfg/video.txt` (Valve kv) | high ([Liquipedia](https://liquipedia.net/dota2/Console)) | Leave the VendorID and DeviceID lines alone. Chamber never touches keys you don't list. |
 | arc-raiders | `%LOCALAPPDATA%\PioneerGame\...\WindowsClient\GameUserSettings.ini` | medium ([FandomWire](https://fandomwire.com/want-better-aim-in-arc-raiders-tweak-this-hidden-setting-right-now/)) | Process name unknown: add it from Task Manager. **Menu settings only.** Players got flagged for hidden config tweaks ([MP1st](https://mp1st.com/news/arc-raiders-config-settings-unfair-advantages)). |
 | overwatch-2 | `Documents\Overwatch\Settings\Settings_v0.ini` | medium | Values may be quoted (`Key = "0"`). If they are, write the quotes into `value`; the engine allows them in INI files. |
@@ -68,7 +67,6 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 | pubg | `%LOCALAPPDATA%\TslGame\...\WindowsNoEditor\GameUserSettings.ini` | high | Graphics may sit in one `ScalabilityGroups=(...)` value. If so, the whole bracketed value is one setting. |
 | delta-force | `{install}/Game/DeltaForce/Saved/Config/WindowsClient/GameUserSettings.ini` | medium ([Steam discussion](https://steamcommunity.com/app/2507950/discussions/0/595136892797804254)) | Process name unknown. Check whether an `%LOCALAPPDATA%\DeltaForce` copy wins instead. |
 | the-finals | `%LOCALAPPDATA%\Discovery\...\WindowsClient\GameUserSettings.ini` | low (inferred from Unreal's layout) | Confirm the folder name first. |
-| call-of-duty | `%LOCALAPPDATA%\Activision\Call of Duty\players\s.1.0.cod26.txt0` on Battle.net, `Documents\Call of Duty\players\s.1.0.cod26.txt0` on Steam (cod) | medium (a third-party MW4 script and real Black Ops 6 files) | One draft covers MW4 and Warzone, since both run in the Call of Duty app. I couldn't confirm that Warzone reads this same file. The Steam path is in `also`, so Chamber edits whichever copies exist. That folder split comes from the script and isn't confirmed on a real PC, so check where your copy writes the file. Steam detection uses app 1938090, the shared Call of Duty app. Check that MW4 installs under it. If `s.1.0.cod26.txt1` sits beside the file, add its path to `also` too. Confirm `cod26-cod.exe` in Task Manager while MW4 runs. |
 | rainbow-six-siege | `Documents\My Games\Rainbow Six - Siege\<account id>\GameSettings.ini` (ini) | high (Ubisoft support's forum replies) | The `*` folder covers every account that has played on this PC. Confirm `RainbowSix.exe` in Task Manager, since Siege X may have renamed it. |
 | rust | `{install}/cfg/client.cfg` (convar) | high (real client.cfg files) | The file holds every console variable, not just menu ones. Use only what the options menu sets. Rust writes this file when it quits. |
 | battlefield-6 | `Documents\Battlefield 6\settings\<launcher>\PROFSAVE_profile` (spaced) | medium (guides and a settings tool; nothing official) | The `*` folder matches the launcher folder, like `steam` or `ea`. If your file sits straight in `settings`, take `*/` out of the path. Confirm `bf6.exe` in Task Manager. |
@@ -78,13 +76,28 @@ A dash means the game wasn't in that ranking, or isn't on that platform.
 
 1. Launch the game once and set every option you care about in its own menu. Then close it.
 2. Open the settings file and find the key for each option. Add an entry for each to `settings`: `key`, `value`, `label`, `values` (display names), and `why` (one plain sentence).
-3. Only use settings the game's menu also exposes. Never hidden ones. That keeps Chamber anti-cheat safe.
+3. Prefer settings the game's menu also exposes. A config-only setting is fine when players commonly change it and the game isn't known to flag it, like `RendererWorkerCount` in Call of Duty. Say in its `why` that it isn't in the menu. Never use one in a game that flags config edits, like ARC Raiders.
 4. Fill in any missing `process` names from Task Manager. They let Chamber refuse to write while the game is running.
 5. Move the file up to `games/`. Then run:
    - `node tools/build-catalog.mjs`
+   - `node tools/sign-catalog.mjs <path-to-private-key>`
    - `cargo test --manifest-path src-tauri/Cargo.toml` (checks every field)
-   - the sign command it prints
 6. Benchmark it and add `proof` (rig, avg and 1% lows before and after, method). Without it, the app shows no performance claim.
+
+## Values that depend on the PC
+
+A `value` can hold placeholders that the app fills in for each PC when it applies the config. The player sees the real number.
+
+| Placeholder | Filled with |
+|---|---|
+| `{refresh}`, `{width}`, `{height}` | The main monitor's refresh rate and resolution |
+| `{cores}` | Physical CPU cores |
+| `{threads}` | Logical processors (with SMT or Hyper-Threading) |
+| `{pcores}` | Performance cores: the P-cores on Intel hybrid CPUs, every core on AMD and older Intel |
+
+Add `-N` (1 to 9) to subtract, never going below 1: `{pcores-1}` is 7 on a 9800X3D and on a 14900K. Benchmark the default, `{pcores}`, and `{pcores-1}` before you ship one.
+
+Add `,max=M` to cap it: `{pcores-1,max=7}` is 7 on a 16-core 9950X and 5 on a 6-core CPU.
 
 ## File formats
 

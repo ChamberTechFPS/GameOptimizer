@@ -4,6 +4,7 @@
   "tile": "TF",
   "launcher": "steam",
   "find": {
+    "exe": "Discovery.exe",
     "steam": 2073850,
     "paths": [
       "{localappdata}/Discovery"

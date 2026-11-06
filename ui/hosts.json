@@ -1,0 +1,8 @@
+{
+  "_comment": "The only catalog and app-update hosts. Fetched origins must also appear in src-tauri/tauri.conf.json connect-src; node tools/check-hosts.mjs enforces that. The default catalog is a public repo you create (ChamberTechFPS/GameOptimizer-catalog). Do not point catalogUrl at the private app repo: raw.githubusercontent.com returns 404 for private files, and players then never receive signed configs. chambertech.net or GitHub Pages are fine too; add that origin to the CSP. releasesUrl is the releases list, not /releases/latest, because /latest hides prereleases. See RELEASING.md.",
+  "catalogUrl": "https://raw.githubusercontent.com/ChamberTechFPS/GameOptimizer-catalog/main/catalog.json",
+  "catalogSigUrl": "https://raw.githubusercontent.com/ChamberTechFPS/GameOptimizer-catalog/main/catalog.json.sig",
+  "releasesUrl": "https://api.github.com/repos/ChamberTechFPS/GameOptimizer/releases?per_page=30",
+  "releasePagePrefix": "https://github.com/ChamberTechFPS/GameOptimizer/",
+  "includePrereleases": false
+}

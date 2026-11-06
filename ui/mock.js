@@ -110,18 +110,32 @@
     return {
       slug: g.slug, name: g.name, tile: g.tile, launcher: g.launcher, found: g.found,
       location: g.folder ?? g.location ?? null, folder: g.folder, hidden: g.hidden,
-      status: statusOf(g), running: g.running, total: settings.length,
+      status: statusOf(g), running: g.running,
+      applyBlock: g.running ? `Close ${g.name} before applying — the config can't be applied while the game is running.` : null,
+      total: settings.length,
       differ: settings.filter((x) => !x.match).length, appliedAt: g.applied ? g.appliedAt : null,
       files: g.files, lock: !!g.lock, settings, manual: g.manual, proof: g.proof ?? null,
     };
   }
 
+  // ?accepted skips the first-launch terms screen
+  const mockState = { terms: location.search.includes("accepted") ? 99 : 0, libraries: [] };
   const find = (slug) => games.find((g) => g.slug === slug);
   const commands = {
-    scan: () => ({ games: games.map(view) }),
+    scan: () => ({ games: games.map(view), terms: mockState.terms, libraries: mockState.libraries }),
+    accept_terms: ({ version }) => { mockState.terms = version; return {}; },
+    add_library: ({ path }) => { if (!mockState.libraries.includes(path)) mockState.libraries.push(path); return {}; },
+    remove_library: ({ path }) => { mockState.libraries = mockState.libraries.filter((l) => l !== path); return {}; },
+    quit: () => { console.log("quit"); return {}; },
+    running: () => ({
+      running: games.filter((g) => g.running).map((g) => ({
+        slug: g.slug,
+        message: `Close ${g.name} before applying — the config can't be applied while the game is running.`,
+      })),
+    }),
     apply: ({ slug }) => {
       const g = find(slug);
-      if (g.running) throw new Error(`Close ${g.name} first, then try again.`);
+      if (g.running) throw new Error(`Close ${g.name} before applying — the config can't be applied while the game is running.`);
       const changed = g.settings.filter((x) => x.now !== x.want).length;
       for (const x of g.settings) x.now = x.want;
       Object.assign(g, { applied: true, appliedAt: Date.now() / 1000, appliedRev: g.rev });
@@ -137,13 +151,45 @@
     clear_folder: ({ slug }) => { const g = find(slug); Object.assign(g, { folder: null, found: g.autoFound }); return {}; },
     set_hidden: ({ slug, hidden }) => { find(slug).hidden = hidden; return {}; },
     open_folder: (args) => { console.log("open_folder", args); return {}; },
-    install_catalog: () => ({ status: "current" }),
+    install_catalog: () => {
+      if (location.search.includes("catalog=bad")) {
+        throw new Error("The config catalog failed its signature check, so it wasn't used.");
+      }
+      return { status: "current" };
+    },
   };
 
   const realFetch = window.fetch.bind(window);
   window.fetch = (url, opts) => {
-    if (String(url).startsWith("https://raw.githubusercontent.com/")) return Promise.resolve(new Response("{}"));
-    if (String(url).startsWith("https://api.github.com/")) return Promise.resolve(new Response("", { status: 404 }));
+    const u = String(url);
+    const q = location.search;
+    // hosts.json and terms.md are local files. Everything else in the preview is sample data.
+    if (!u.startsWith("https://")) return realFetch(url, opts);
+    if (u.includes("catalog.json")) {
+      if (q.includes("catalog=down")) return Promise.resolve(new Response("missing", { status: 404 }));
+      return Promise.resolve(new Response(new Uint8Array([123, 125])));
+    }
+    if (u.startsWith("https://api.github.com/")) {
+      if (q.includes("release=down")) return Promise.resolve(new Response("nope", { status: 404 }));
+      const prefix = "https://github.com/ChamberTechFPS/GameOptimizer/releases/tag/";
+      const rel = (tag, extra = {}) => ({ tag_name: tag, html_url: prefix + tag, draft: false, prerelease: false, ...extra });
+      if (q.includes("release=new")) {
+        const body = [
+          rel("v1.0.1-beta.1", { prerelease: true }),
+          rel("v2.0.0", { draft: true }),
+          rel("v9.9.9", { html_url: "https://github.com/ChamberTechFPS/GameOptimizer-evil/releases/tag/v9.9.9" }),
+          rel("v1.0.1"),
+        ];
+        return Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } }));
+      }
+      if (q.includes("release=beta")) {
+        return Promise.resolve(new Response(JSON.stringify([rel("v1.0.1-beta.1", { prerelease: true })]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+      return Promise.resolve(new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } }));
+    }
     return realFetch(url, opts);
   };
 
@@ -155,8 +201,13 @@
         }, 120);
       }),
     },
-    dialog: { open: async () => "D:\\Games\\Marvel Rivals" },
+    dialog: { open: async (o) => (o?.title?.startsWith("Pick a folder") ? "D:\\Games" : "D:\\Games\\Marvel Rivals") },
     opener: { openUrl: async (url) => console.log("openUrl", url) },
-    app: { getVersion: async () => "1.0.0" },
+    app: {
+      getVersion: async () => {
+        const m = location.search.match(/(?:^|[?&])version=([^&]+)/);
+        return m ? decodeURIComponent(m[1]) : "1.0.0";
+      },
+    },
   };
 })();

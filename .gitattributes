@@ -3,3 +3,8 @@
 *.ico binary
 *.woff2 binary
 *.sig binary
+# Signed bytes. The rules above would otherwise treat catalog.json as text and
+# rewrite its line endings, which invalidates catalog.json.sig. -text leaves the
+# committed bytes alone. The signature is binary, so Git never diffs it as lines.
+catalog.json -text linguist-language=JSON
+catalog.json.sig binary

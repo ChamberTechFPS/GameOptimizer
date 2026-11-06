@@ -3,7 +3,7 @@
   "name": "Rocket League",
   "tile": "RL",
   "launcher": "epic",
-  "find": { "steam": 252950, "epic": "Rocket League", "paths": ["{documents}/My Games/Rocket League"] },
+  "find": { "steam": 252950, "epic": "Rocket League", "paths": ["{documents}/My Games/Rocket League"], "exe": "Binaries/Win64/RocketLeague.exe" },
   "process": ["RocketLeague.exe"],
   "files": [
     {

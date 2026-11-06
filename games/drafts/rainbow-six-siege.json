@@ -4,6 +4,7 @@
   "tile": "R6",
   "launcher": "ubisoft",
   "find": {
+    "exe": "RainbowSix.exe",
     "steam": 359550,
     "paths": [
       "{documents}/My Games/Rainbow Six - Siege"
