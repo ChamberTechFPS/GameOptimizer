@@ -83,6 +83,17 @@ h2 { font-size: 18px; font-weight: 600; }
 .btn-danger { background: transparent; border-color: rgba(248, 113, 113, 0.55); color: var(--bad); }
 .btn-lg { padding: 11px 20px; font-size: 14px; }
 .btn-icon { padding: 7px; }
+.btn:disabled,
+.btn:disabled:hover,
+.btn:disabled:active {
+  background: var(--raised);
+  border-color: var(--line);
+  color: var(--text-3);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
 body.busy .btn { pointer-events: none; opacity: 0.6; }
 
 /* Top bar */
@@ -238,6 +249,16 @@ dialog::backdrop { background: rgba(5, 5, 8, 0.6); }
 
 .note { display: flex; gap: 8px; margin: 16px 0; font-size: 13px; color: var(--text-2); }
 .note .icon { margin-top: 2px; }
+.note.running-warn {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-ctl);
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--bad);
+  font-weight: 600;
+}
+.note.running-warn span { min-width: 0; }
+.drawer-body .note.running-warn { margin: 0 0 16px; }
 .proof { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg); }
 .proof-num { margin-top: 4px; font-size: 15px; font-weight: 700; }
 

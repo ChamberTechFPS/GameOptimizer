@@ -4,57 +4,53 @@ The app only applies a catalog that verifies against a public key compiled into 
 
 ## Still to do before players can get configs
 
-1. **Re-sign `catalog.json`.** The signature in git does not match the current file. CI allows this one snapshot (those exact bytes, and no others) so the branch can land without the private key. `release.yml` and `test-build.yml` do not. A built app has no catalog it will load until you sign. Changing `catalog.json` or `catalog.json.sig` without a valid signature fails CI again.
-2. **Create a public catalog host** and publish `catalog.json` and `catalog.json.sig` there. The default URL is a repo that does not exist yet. Do not create it from a bot; create it yourself.
-3. **Make app releases reachable.** Update checks call `api.github.com` for this repo. That 404s while the repo is private. The app now says so, instead of failing silently. Publish the repo, or point `releasesUrl` at a public repo that actually has the releases.
+1. **Create a public catalog host** and publish `catalog.json` and `catalog.json.sig` there. The default URL is a repo that does not exist yet. Do not create it from a bot; create it yourself.
+2. **Make app releases reachable.** Update checks call `api.github.com` for this repo. That 404s while the repo is private. The app now says so, instead of failing silently. Publish the repo, or point `releasesUrl` at a public repo that actually has the releases.
 
-v1.0.0-beta.1 (about two downloads) trusts only the old RSA-3072 key. That private key is gone, and this app trusts the RSA-4096 key instead. Those installs will reject every newly signed catalog. They need one reinstall. The spare key slot below is so the next rotation does not do that again.
+The catalog in git already verifies. `catalog.json` is the same bytes as on `rebuild`, and `catalog.json.sig` is the signature from that branch for the offline RSA-4096 key. CI still allows one historical unsigned snapshot (the catalog as edited after commit `033c850`, still carrying that commit's signature) and fails any other bytes that do not verify. `release.yml` and `test-build.yml` do not allow that snapshot. A built app loads this catalog.
 
-## Why the signature check fails
+v1.0.0-beta.1 (about two downloads) trusts only the old RSA-3072 key. That private key is gone. Those installs will reject every newly signed catalog. They need one reinstall. The spare key slot below is so the next rotation does not do that again.
 
-Checked against the current `CURRENT_MODULUS_HEX` in `src-tauri/src/catalog.rs`:
+## The signing key
 
-- `catalog.json.sig` is 512 bytes, an RSA-4096 signature. It was written in commit `033c850` ("Sign the catalog with the new key").
-- That signature **verifies** for the `catalog.json` from `033c850`, using the RSA-4096 public key that is embedded now.
-- It does **not** verify for today's `catalog.json`. These commits changed the catalog and did not replace the signature:
-  - `21163c5` Set Fortnite view distance to Epic
-  - `69354cd` Ship the Call of Duty config for Modern Warfare 4
-  - `9c824ae` Cap Call of Duty's worker threads at 7 and use cod.exe
-- Commit `82eac35` replaced the embedded RSA-3072 key with this RSA-4096 key. It did not change `catalog.json.sig`. The 4096-bit key is the one that signed `033c850`. The 3072-bit key cannot have produced a 512-byte signature.
-- Line endings are not the cause. `catalog.json` is LF-only, and the signed snapshot verifies byte for byte. `.gitattributes` now marks `catalog.json` as `-text` and `catalog.json.sig` as binary so a later checkout cannot rewrite them.
+`CURRENT_MODULUS_HEX` in `src-tauri/src/catalog.rs` is the offline RSA-4096 public key that `rebuild` trusts. The private key stays on the Windows PC at `F:\GameOptimizer\signing\catalog-signing.key`. It is not in this repo. `.gitignore` ignores `signing/` and `*.key`.
 
-Re-sign the current file with that same RSA-4096 private key. Generate a new key only if you no longer have it.
+The previous RSA-4096 private key (the one that signed commit `033c850`) is unavailable, so this branch does not trust that modulus. `SPARE_MODULUS_HEX` stays empty until the next rotation. Leave the old modulus out of both `CURRENT` and `SPARE`.
+
+`TRUSTED_MODULI` is `CURRENT_MODULUS_HEX`, then `SPARE_MODULUS_HEX`. A signature from either non-empty key is accepted. Empty is ignored.
+
+The known-unsigned allowlist is that older pair only. The hashes live in `tools/verify-catalog.mjs` and `catalog::tests`. The files in git are the signed pair, so the allowlist is not what makes them pass. `.gitattributes` marks `catalog.json` as `-text` and `catalog.json.sig` as binary so a later checkout cannot rewrite them. `catalog.json` is LF-only.
 
 ## Re-sign the catalog
 
-From the repo root, on the machine that has the private key. Git for Windows includes `openssl`.
+Do this when `games/*.json` changes, from the repo root, on the machine that has the private key. Git for Windows includes `openssl`. The committed catalog already verifies, so this is the next change, not a fix for the files in git.
 
 1. Confirm the key is the one the app embeds. The hex after `Modulus=` must equal `CURRENT_MODULUS_HEX` in `src-tauri/src/catalog.rs` (ignore case):
 
    ```bash
-   openssl pkey -in ~/.config/chamber-signing/catalog-signing.key -pubout -outform DER \
+   openssl pkey -in 'F:\GameOptimizer\signing\catalog-signing.key' -pubout -outform DER \
      | openssl rsa -pubin -inform DER -modulus -noout
    ```
 
    A traditional PKCS#1 PEM also works:
 
    ```bash
-   openssl rsa -in ~/.config/chamber-signing/catalog-signing.key -modulus -noout
+   openssl rsa -in 'F:\GameOptimizer\signing\catalog-signing.key' -modulus -noout
    ```
 
-   If it does not match, stop. Either you have the wrong file, or the key that signed `033c850` is lost. Pasting a different modulus into `CURRENT_MODULUS_HEX` means every build that already shipped this key, including the one you are about to make, will reject catalogs signed by the new key. Use the spare-key steps further down instead of swapping `CURRENT` out from under a release.
+   If it does not match, stop. You have the wrong file. Pasting a different modulus into `CURRENT_MODULUS_HEX` means every build that already shipped this key will reject catalogs signed by the new key. Use the spare-key steps further down instead of swapping `CURRENT` out from under a release.
 
 2. Rebuild only if `games/*.json` changed, then sign the exact bytes. `--check` does not write. The signer refuses a key inside the repo and a key the app does not trust, and it will not sign a catalog that doesn't match `games/`.
 
    ```bash
    node tools/build-catalog.mjs --check
-   node tools/sign-catalog.mjs ~/.config/chamber-signing/catalog-signing.key
+   node tools/sign-catalog.mjs 'F:\GameOptimizer\signing\catalog-signing.key'
    ```
 
    The script runs this openssl command, then `node tools/verify-catalog.mjs`:
 
    ```bash
-   openssl dgst -sha256 -sign ~/.config/chamber-signing/catalog-signing.key -out catalog.json.sig catalog.json
+   openssl dgst -sha256 -sign 'F:\GameOptimizer\signing\catalog-signing.key' -out catalog.json.sig catalog.json
    ```
 
 3. Confirm, then commit **both** files. Do not open `catalog.json` in an editor first. Do not let a tool change its line endings.
@@ -66,12 +62,6 @@ From the repo root, on the machine that has the private key. Git for Windows inc
    ```
 
 `verify-catalog.mjs` prints the same commands when the signature does not match. CI runs it too.
-
-On Windows the key path is whatever you use, for example:
-
-```powershell
-node tools/sign-catalog.mjs $env:USERPROFILE\.config\chamber-signing\catalog-signing.key
-```
 
 ## Create the public catalog host
 
@@ -120,7 +110,7 @@ While this repo is private, the releases request 404s and the app shows **Couldn
 
 1. Edit `games/<game>.json`.
 2. `node tools/build-catalog.mjs`
-3. `node tools/sign-catalog.mjs <path-to-private-key>`
+3. `node tools/sign-catalog.mjs F:\GameOptimizer\signing\catalog-signing.key`
 4. `node tools/verify-catalog.mjs` and `cargo test --manifest-path src-tauri/Cargo.toml`
 5. Commit `catalog.json` and `catalog.json.sig` together.
 6. Copy those two files, byte for byte, to the public catalog host.

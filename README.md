@@ -45,17 +45,18 @@ Using the app means accepting the [terms of use](ui/terms.md). The app asks on f
 
 ## Publishing configs
 
-Configs ship as one signed file, `catalog.json`, from a **public** host. The addresses live in [`ui/hosts.json`](ui/hosts.json). The app repo can stay private: `raw.githubusercontent.com` returns 404 for private files, and players would never receive a catalog published only here. Creating that host, signing, and what to do about the catalog that's already out of date are in [RELEASING.md](RELEASING.md).
+Configs ship as one signed file, `catalog.json`, from a **public** host. The addresses live in [`ui/hosts.json`](ui/hosts.json). The app repo can stay private: `raw.githubusercontent.com` returns 404 for private files, and players would never receive a catalog published only here. Creating that host, and how to sign the next catalog, are in [RELEASING.md](RELEASING.md).
 
 After the host exists:
 
 1. Edit or add `games/<game>.json`. Set `find.exe` (the exe's path inside the install folder) so the game turns up in players' own game folders. To finish a new game, see [`games/drafts/README.md`](games/drafts/README.md).
 2. Rebuild the catalog: `node tools/build-catalog.mjs`
-3. Sign it. Only the keyholder can do this: `node tools/sign-catalog.mjs <path-to-private-key>`
+3. Sign it. Only the keyholder can do this. The private key lives offline (example path `F:\GameOptimizer\signing\catalog-signing.key`). Never commit `signing/` or `*.key`.
+   `node tools/sign-catalog.mjs F:\GameOptimizer\signing\catalog-signing.key`
 4. Run `node tools/verify-catalog.mjs` and `cargo test --manifest-path src-tauri/Cargo.toml`
 5. Commit `catalog.json` and `catalog.json.sig` together, push, and copy those two files, unchanged, to the public catalog host.
 
-CI fails if `catalog.json` doesn't match `games/`, or if the signature doesn't verify and the files aren't the one already-known unsigned snapshot. A release fails on any bad signature. Never put the private key in the repo or in CI secrets: a key GitHub can reach defeats the point of signing. Keep an offline backup of the key, on a USB stick or in a password manager. Losing it means a new key and a new app release. The app trusts the current key and one spare slot, so the next rotation doesn't have to strand anyone who already updated. See [RELEASING.md](RELEASING.md).
+CI fails if `catalog.json` doesn't match `games/`, or if the signature doesn't verify and the files aren't the one already-known unsigned snapshot. A release fails on any bad signature. Never put the private key in the repo or in CI secrets: a key GitHub can reach defeats the point of signing. Keep the key offline and keep a backup, on a USB stick or in a password manager. Losing it means a new key and a new app release. The app trusts the current key and one spare slot, so the next rotation doesn't have to strand anyone who already updated. See [RELEASING.md](RELEASING.md).
 
 ## Releasing the app
 

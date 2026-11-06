@@ -25,7 +25,7 @@ const keyAbs = realpathSync(keyResolved);
 const rel = relative(root, keyAbs);
 const insideRepo = rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
 if (insideRepo) {
-  fail("Refusing to sign: the private key is inside the repository.\nMove it outside the repo (for example ~/.config/chamber-signing/catalog-signing.key) and run this again.");
+  fail("Refusing to sign: the private key is inside the repository.\nMove it outside the repo (for example F:\\GameOptimizer\\signing\\catalog-signing.key) and run this again.");
 }
 
 let modulus;

@@ -110,7 +110,9 @@
     return {
       slug: g.slug, name: g.name, tile: g.tile, launcher: g.launcher, found: g.found,
       location: g.folder ?? g.location ?? null, folder: g.folder, hidden: g.hidden,
-      status: statusOf(g), running: g.running, total: settings.length,
+      status: statusOf(g), running: g.running,
+      applyBlock: g.running ? `Close ${g.name} before applying — the config can't be applied while the game is running.` : null,
+      total: settings.length,
       differ: settings.filter((x) => !x.match).length, appliedAt: g.applied ? g.appliedAt : null,
       files: g.files, lock: !!g.lock, settings, manual: g.manual, proof: g.proof ?? null,
     };
@@ -125,9 +127,15 @@
     add_library: ({ path }) => { if (!mockState.libraries.includes(path)) mockState.libraries.push(path); return {}; },
     remove_library: ({ path }) => { mockState.libraries = mockState.libraries.filter((l) => l !== path); return {}; },
     quit: () => { console.log("quit"); return {}; },
+    running: () => ({
+      running: games.filter((g) => g.running).map((g) => ({
+        slug: g.slug,
+        message: `Close ${g.name} before applying — the config can't be applied while the game is running.`,
+      })),
+    }),
     apply: ({ slug }) => {
       const g = find(slug);
-      if (g.running) throw new Error(`Close ${g.name} first, then try again.`);
+      if (g.running) throw new Error(`Close ${g.name} before applying — the config can't be applied while the game is running.`);
       const changed = g.settings.filter((x) => x.now !== x.want).length;
       for (const x of g.settings) x.now = x.want;
       Object.assign(g, { applied: true, appliedAt: Date.now() / 1000, appliedRev: g.rev });

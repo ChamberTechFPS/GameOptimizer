@@ -86,6 +86,8 @@ pub struct GameView {
     pub hidden: bool,
     pub status: &'static str,
     pub running: bool,
+    /// Set while `running`: the same sentence `apply` returns, for the on-screen warning.
+    pub apply_block: Option<String>,
     pub total: usize,
     pub differ: usize,
     pub applied_at: Option<u64>,
@@ -221,6 +223,7 @@ impl Engine {
             }
         }
         let differ = rows.iter().filter(|r| !r.matched).count();
+        let apply_block = pc.apply_block(g).map(|b| b.message);
         let status = match (&location, applied) {
             (None, _) => "not-found",
             _ if !g.manual.is_empty() => "manual",
@@ -240,7 +243,8 @@ impl Engine {
             folder: gs.and_then(|s| s.folder.as_ref()).map(|f| f.display().to_string()),
             hidden: gs.is_some_and(|s| s.hidden),
             status,
-            running: pc.is_running(g),
+            running: apply_block.is_some(),
+            apply_block,
             total: rows.len(),
             differ,
             applied_at: applied.map(|a| a.at),
@@ -259,7 +263,7 @@ impl Engine {
             return Err(format!("{} keeps its settings on its servers. Use the checklist instead.", g.name));
         }
         if pc.is_running(g) {
-            return Err(format!("Close {} first, then try again.", g.name));
+            return Err(detect::close_before_applying(&g.name));
         }
         let mut state = self.load_state()?;
         let gs = state.games.entry(slug.to_string()).or_default();
@@ -659,9 +663,30 @@ mod tests {
         let mut fx = fixture("running");
         fx.pc.running.insert("testgame.exe".into());
         let err = fx.engine.apply(&fx.cat, &fx.pc, "test-game").unwrap_err();
+        assert_eq!(err, detect::close_before_applying("Test Game"));
+        assert_eq!(fs::read_to_string(&fx.file).unwrap(), ORIGINAL, "a running game is not written");
+        assert!(fx.engine.load_state().unwrap().games.get("test-game").and_then(|g| g.applied.as_ref()).is_none());
+        let view = &fx.engine.scan(&fx.cat, &fx.pc).unwrap()[0];
+        assert!(view.running);
+        assert_eq!(view.apply_block.as_deref(), Some(err.as_str()));
+
+        // An unrelated exe leaves this game free to apply.
+        fx.pc.running.clear();
+        fx.pc.running.insert("unrelated.exe".into());
+        let view = &fx.engine.scan(&fx.cat, &fx.pc).unwrap()[0];
+        assert!(!view.running);
+        assert_eq!(view.apply_block, None);
+        assert_eq!(fx.engine.apply(&fx.cat, &fx.pc, "test-game").unwrap(), 4);
+
+        // Launched after the check the UI made: the fresh snapshot still refuses, and the file stays.
+        fx.pc.running.insert("testgame.exe".into());
+        let written = fs::read_to_string(&fx.file).unwrap();
+        let err = fx.engine.apply(&fx.cat, &fx.pc, "test-game").unwrap_err();
+        assert_eq!(err, detect::close_before_applying("Test Game"));
+        assert_eq!(fs::read_to_string(&fx.file).unwrap(), written);
+        let err = fx.engine.revert(&fx.cat, &fx.pc, "test-game").unwrap_err();
         assert!(err.contains("Close Test Game"), "{err}");
-        assert_eq!(fs::read_to_string(&fx.file).unwrap(), ORIGINAL);
-        assert!(fx.engine.scan(&fx.cat, &fx.pc).unwrap()[0].running);
+        assert_eq!(fs::read_to_string(&fx.file).unwrap(), written);
     }
 
     #[test]

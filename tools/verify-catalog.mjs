@@ -98,26 +98,24 @@ const endings = json.includes(0x0d)
   ? "This catalog.json contains CR bytes. That alone breaks a signature made from LF bytes."
   : "This catalog.json is LF-only, so line endings are not why this copy fails.";
 console.error(`
-The signature on disk is from commit 033c850. That signature matches CURRENT_MODULUS_HEX
-for the catalog.json from that commit. Later commits changed catalog.json (Fortnite view
-distance, the Call of Duty config, the worker-thread cap) and did not update
-catalog.json.sig. ${endings}
+${endings}
 
 Re-sign the current bytes with the RSA-4096 private key whose public modulus is
-CURRENT_MODULUS_HEX. Do not generate a new key unless that private key is lost.
-The private key stays on your machine. Never commit it or put it in CI secrets.
+CURRENT_MODULUS_HEX. That key stays offline at F:\\GameOptimizer\\signing\\catalog-signing.key.
+Do not generate a new key unless that private key is lost.
+Never commit a private key or put one in CI secrets.
 
   node tools/build-catalog.mjs --check
-  node tools/sign-catalog.mjs ~/.config/chamber-signing/catalog-signing.key
+  node tools/sign-catalog.mjs F:\\GameOptimizer\\signing\\catalog-signing.key
 
 Or with openssl directly, from the repo root:
 
-  openssl dgst -sha256 -sign ~/.config/chamber-signing/catalog-signing.key -out catalog.json.sig catalog.json
+  openssl dgst -sha256 -sign F:\\GameOptimizer\\signing\\catalog-signing.key -out catalog.json.sig catalog.json
   node tools/verify-catalog.mjs
 
 Confirm the key first. The printed modulus must equal CURRENT_MODULUS_HEX (case insensitive, no Modulus= prefix):
 
-  openssl pkey -in ~/.config/chamber-signing/catalog-signing.key -pubout -outform DER | openssl rsa -pubin -inform DER -modulus -noout
+  openssl pkey -in F:\\GameOptimizer\\signing\\catalog-signing.key -pubout -outform DER | openssl rsa -pubin -inform DER -modulus -noout
 
 On Windows, Git's openssl is the same command. Pass the key path you actually use.
 Then run: cargo test --manifest-path src-tauri/Cargo.toml

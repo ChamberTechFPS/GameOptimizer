@@ -45,7 +45,7 @@ try {
 const gamesMatch = Boolean(current) && JSON.stringify(current.games) === JSON.stringify(games);
 const canonicalCurrent = current ? canonical(current.version, games) : null;
 const bytesMatch = Boolean(raw && canonicalCurrent && raw.equals(canonicalCurrent));
-const signHint = "  node tools/sign-catalog.mjs <path-to-private-key>";
+const signHint = String.raw`  node tools/sign-catalog.mjs F:\GameOptimizer\signing\catalog-signing.key`;
 
 if (process.argv.includes("--check")) {
   if (!gamesMatch || !bytesMatch) {
