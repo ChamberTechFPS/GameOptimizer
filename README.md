@@ -11,7 +11,7 @@ I optimize gaming PCs at [ChamberTech](https://www.chambertech.net). This app do
 - **Shows its work.** For every setting you see your value, mine, and one line on why.
 - **Catches resets.** When a game update puts something back, the card says so, and Re-apply fixes it.
 - **Reverts exactly.** If nothing else touched the file, you get the original back byte for byte. If the game or you changed other things since, only my settings are undone and yours stay.
-- **Gets new configs.** New and improved configs come from this repo when I publish them. No reinstall.
+- **Gets new configs.** New and improved configs download from a public signed catalog when the app opens. No reinstall.
 
 ## Supported games
 
@@ -45,22 +45,26 @@ Using the app means accepting the [terms of use](ui/terms.md). The app asks on f
 
 ## Publishing configs
 
+Configs ship as one signed file, `catalog.json`, from a **public** host. The addresses live in [`ui/hosts.json`](ui/hosts.json). The app repo can stay private: `raw.githubusercontent.com` returns 404 for private files, and players would never receive a catalog published only here. Creating that host, and how to sign the next catalog, are in [RELEASING.md](RELEASING.md).
+
+After the host exists:
+
 1. Edit or add `games/<game>.json`. Set `find.exe` (the exe's path inside the install folder) so the game turns up in players' own game folders. To finish a new game, see [`games/drafts/README.md`](games/drafts/README.md).
 2. Rebuild the catalog: `node tools/build-catalog.mjs`
 3. Sign it. Only the keyholder can do this. The private key lives offline (example path `F:\GameOptimizer\signing\catalog-signing.key`). Never commit `signing/` or `*.key`.
-   `openssl dgst -sha256 -sign F:\GameOptimizer\signing\catalog-signing.key -out catalog.json.sig catalog.json`
-4. Run the tests: `cargo test --manifest-path src-tauri/Cargo.toml`
-5. Commit and push. Players get the new configs the next time they open the app.
+   `node tools/sign-catalog.mjs F:\GameOptimizer\signing\catalog-signing.key`
+4. Run `node tools/verify-catalog.mjs` and `cargo test --manifest-path src-tauri/Cargo.toml`
+5. Commit `catalog.json` and `catalog.json.sig` together, push, and copy those two files, unchanged, to the public catalog host.
 
-CI fails if `catalog.json` is out of date or its signature doesn't match. Never put the private key in the repo or in CI secrets: a key GitHub can reach defeats the point of signing. Keep the key offline and keep a backup, on a USB stick or in a password manager. Losing it means a new key and a new app release.
+CI fails if `catalog.json` doesn't match `games/`, or if the signature doesn't verify and the files aren't the one already-known unsigned snapshot. A release fails on any bad signature. Never put the private key in the repo or in CI secrets: a key GitHub can reach defeats the point of signing. Keep the key offline and keep a backup, on a USB stick or in a password manager. Losing it means a new key and a new app release. The app trusts the current key and one spare slot, so the next rotation doesn't have to strand anyone who already updated. See [RELEASING.md](RELEASING.md).
 
 ## Releasing the app
 
-1. Set the version in `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`.
-2. Tag it (`v1.0.1`) and push the tag. CI builds the installer into a draft release.
-3. Review the draft on GitHub and publish it. The app's update check only sees published releases.
+1. Set the same version in `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`. For a beta, use the full prerelease (`1.0.0-beta.2`), not `1.0.0`. The app reports that string, and a beta stamped `1.0.0` can't tell a newer beta from itself.
+2. Tag it (`v1.0.1`, or `v1.0.0-beta.2`) and push the tag. The tag has to be `v` plus that version. CI builds the installer.
+3. A stable tag becomes a draft release. Review it and publish it. A tag with a hyphen becomes a prerelease. The app reads the releases list, not `/releases/latest`, because `/latest` hides prereleases. Stable builds ignore prereleases. A build whose own version is a prerelease sees newer betas.
 
-The installer isn't code-signed yet, so Windows SmartScreen warns on first run. Signing comes before public launch.
+The installer isn't code-signed yet, so Windows SmartScreen warns on first run. Signing comes before public launch. Update checks 404 until the repo that holds the releases is public.
 
 ## Building from source
 

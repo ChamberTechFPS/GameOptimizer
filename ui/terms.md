@@ -1,6 +1,6 @@
 # Terms of use
 
-Version 2 · Updated 2026-11-02
+Version 3 · Updated 2026-11-03
 
 Chamber Game Optimizer is made by ChamberTech LLC. I'm Campbell, and I run it. These terms are between you and ChamberTech LLC. When you click Accept, you agree to them. If you don't agree, click Decline and the app closes.
 
@@ -28,11 +28,11 @@ To the fullest extent the law allows, ChamberTech LLC is not liable for any indi
 
 ## Configs change
 
-I publish new and updated configs from the app's GitHub repo. The app downloads them when it starts and only uses ones signed with my key. A config can change between versions of the app.
+I publish new and updated configs as a signed catalog. The app downloads it when it starts and only uses a copy that passes the signature check. A config can change between versions of the app.
 
 ## Your data
 
-The app has no telemetry. It doesn't send your files, settings, or anything about your PC anywhere. It only contacts GitHub, to check for new configs and app updates. Your settings and backups stay in `%LOCALAPPDATA%\ChamberTech\GameOptimizer`.
+The app has no telemetry. It doesn't send your files, settings, or anything about your PC anywhere. It contacts the catalog host and GitHub only to check for new configs and app updates. Your settings and backups stay in `%LOCALAPPDATA%\ChamberTech\GameOptimizer`.
 
 ## Not affiliated
 
