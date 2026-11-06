@@ -39,5 +39,5 @@ if (process.argv.includes("--check")) {
   const version = Math.max(Math.floor(Date.now() / 1000), (current?.version ?? 0) + 1);
   writeFileSync(path, `${JSON.stringify({ version, games }, null, 2)}\n`);
   console.log(`Wrote catalog.json version ${version} with ${games.length} games. Now sign it:`);
-  console.log("  openssl dgst -sha256 -sign ~/.config/chamber-signing/catalog-signing.key -out catalog.json.sig catalog.json");
+  console.log(String.raw`  openssl dgst -sha256 -sign F:\GameOptimizer\signing\catalog-signing.key -out catalog.json.sig catalog.json`);
 }
