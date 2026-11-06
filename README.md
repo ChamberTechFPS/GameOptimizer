@@ -47,12 +47,12 @@ Using the app means accepting the [terms of use](ui/terms.md). The app asks on f
 
 1. Edit or add `games/<game>.json`. Set `find.exe` (the exe's path inside the install folder) so the game turns up in players' own game folders. To finish a new game, see [`games/drafts/README.md`](games/drafts/README.md).
 2. Rebuild the catalog: `node tools/build-catalog.mjs`
-3. Sign it. Only the keyholder can do this:
-   `openssl dgst -sha256 -sign ~/.config/chamber-signing/catalog-signing.key -out catalog.json.sig catalog.json`
+3. Sign it. Only the keyholder can do this. The private key lives offline (example path `F:\GameOptimizer\signing\catalog-signing.key`). Never commit `signing/` or `*.key`.
+   `openssl dgst -sha256 -sign F:\GameOptimizer\signing\catalog-signing.key -out catalog.json.sig catalog.json`
 4. Run the tests: `cargo test --manifest-path src-tauri/Cargo.toml`
 5. Commit and push. Players get the new configs the next time they open the app.
 
-CI fails if `catalog.json` is out of date or its signature doesn't match. Never put the private key in the repo or in CI secrets: a key GitHub can reach defeats the point of signing. Keep an offline backup of the key, on a USB stick or in a password manager. Losing it means a new key and a new app release.
+CI fails if `catalog.json` is out of date or its signature doesn't match. Never put the private key in the repo or in CI secrets: a key GitHub can reach defeats the point of signing. Keep the key offline and keep a backup, on a USB stick or in a password manager. Losing it means a new key and a new app release.
 
 ## Releasing the app
 
