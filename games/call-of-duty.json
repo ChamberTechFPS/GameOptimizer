@@ -15,9 +15,9 @@
   ],
   "files": [
     {
-      "path": "{localappdata}/Activision/Call of Duty/players/s.1.0.cod26.txt0",
+      "path": "{localappdata}/Activision/Call of Duty/players/s.1.0.cod26.txt",
       "also": [
-        "{documents}/Call of Duty/players/s.1.0.cod26.txt0"
+        "{documents}/Call of Duty/players/s.1.0.cod26.txt"
       ],
       "format": "cod",
       "settings": [
