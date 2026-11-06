@@ -1,5 +1,5 @@
 {
-  "version": 1793992935,
+  "version": 1793994677,
   "games": [
     {
       "slug": "call-of-duty",
@@ -64,11 +64,324 @@
               "value": "{pcores-1,max=7}",
               "label": "Renderer worker threads",
               "why": "One less than your performance cores, so the game's main thread keeps a core to itself. Capped at 7, which tested best on CPUs with more than 8 cores. Not in the game's menu."
+            },
+            {
+              "key": "RecommendedSet@0",
+              "value": "true",
+              "label": "Keep these settings",
+              "values": {
+                "true": "On",
+                "false": "Off"
+              },
+              "why": "Stops the game resetting your graphics to its recommended preset on the next launch. Not in the game's menu."
+            },
+            {
+              "key": "GraphicsQuality@0",
+              "value": "Balanced",
+              "label": "Quality preset",
+              "why": "Matches the preset these settings were tested under, so the game keeps the custom values below."
+            },
+            {
+              "key": "VSync@0",
+              "value": "disabled",
+              "label": "V-Sync (gameplay)",
+              "values": {
+                "disabled": "Off"
+              },
+              "why": "V-Sync holds frames back to match the screen, which adds input lag."
+            },
+            {
+              "key": "VSyncInMenu@0",
+              "value": "disabled",
+              "label": "V-Sync (menus)",
+              "values": {
+                "disabled": "Off"
+              },
+              "why": "Keeps menus as responsive as the game."
+            },
+            {
+              "key": "ResolutionMultiplier@0",
+              "value": "100",
+              "label": "Render resolution",
+              "values": {
+                "100": "100%"
+              },
+              "why": "Renders at your full resolution, so enemies stay sharp."
+            },
+            {
+              "key": "DynamicSceneResolution@0",
+              "value": "false",
+              "label": "Dynamic resolution",
+              "values": {
+                "true": "On",
+                "false": "Off"
+              },
+              "why": "Stops the game blurring the picture when frames dip."
+            },
+            {
+              "key": "AATechniquePreferredMP@0",
+              "value": "SMAA",
+              "label": "Anti-aliasing",
+              "why": "SMAA smooths edges with almost no cost and no upscaling blur."
+            },
+            {
+              "key": "TextureQuality@0",
+              "value": "3",
+              "label": "Texture resolution",
+              "values": {
+                "0": "Very high",
+                "1": "High",
+                "2": "Normal",
+                "3": "Very low"
+              },
+              "why": "Low textures free up video memory and cut stutter. Players read the same either way."
+            },
+            {
+              "key": "TextureFilter@0",
+              "value": "aniso 2x",
+              "label": "Texture filter anisotropic",
+              "values": {
+                "aniso 2x": "Low"
+              },
+              "why": "Lowest filtering for the most frames."
+            },
+            {
+              "key": "ModelQuality@0",
+              "value": "Low Quality",
+              "label": "Detail quality level",
+              "values": {
+                "Low Quality": "Low"
+              },
+              "why": "Lower model detail for more frames."
+            },
+            {
+              "key": "ParticleQuality@0",
+              "value": "very low",
+              "label": "Particle resolution",
+              "values": {
+                "very low": "Very low"
+              },
+              "why": "Smoke and explosions cost less and block less of your view."
+            },
+            {
+              "key": "ShaderQuality@0",
+              "value": "Low",
+              "label": "Shader quality",
+              "why": "Lower shader cost for more frames."
+            },
+            {
+              "key": "ShadingQuality@0",
+              "value": "Low",
+              "label": "Shading quality",
+              "why": "Lower shading cost for more frames."
+            },
+            {
+              "key": "ShadowQuality@0",
+              "value": "Very_Low",
+              "label": "Shadow quality",
+              "values": {
+                "Very_Low": "Very low"
+              },
+              "why": "Shadows are one of the most expensive settings."
+            },
+            {
+              "key": "ShadowFilteringQuality@0",
+              "value": "Low",
+              "label": "Shadow filtering",
+              "why": "Cheaper shadow edges for more frames."
+            },
+            {
+              "key": "ScreenSpaceShadowQuality@0",
+              "value": "Off",
+              "label": "Screen space shadows",
+              "why": "Turns off extra contact shadows for more frames."
+            },
+            {
+              "key": "SSRQuality@0",
+              "value": "Off",
+              "label": "Screen space reflections",
+              "why": "Reflections cost frames and add visual noise."
+            },
+            {
+              "key": "SSRQuality@1",
+              "value": "Off",
+              "label": "Screen space reflections (variant)",
+              "why": "The same reflections setting, kept in step."
+            },
+            {
+              "key": "AmbientLightingQuality@0",
+              "value": "Off",
+              "label": "Ambient lighting",
+              "why": "Turns off costly indirect lighting for more frames."
+            },
+            {
+              "key": "TerrainQuality@0",
+              "value": "Very Low",
+              "label": "Terrain quality",
+              "why": "Lower ground detail for more frames."
+            },
+            {
+              "key": "Tessellation@0",
+              "value": "0_Off",
+              "label": "Tessellation",
+              "values": {
+                "0_Off": "Off"
+              },
+              "why": "Tessellation adds geometry you won't notice in a fight."
+            },
+            {
+              "key": "VolumetricQuality@0",
+              "value": "QUALITY_LOW",
+              "label": "Volumetric quality",
+              "values": {
+                "QUALITY_LOW": "Low"
+              },
+              "why": "Lower fog and light shafts for more frames and clearer sight lines."
+            },
+            {
+              "key": "VolumetricQuality@1",
+              "value": "QUALITY_LOW",
+              "label": "Volumetric quality (variant)",
+              "values": {
+                "QUALITY_LOW": "Low"
+              },
+              "why": "The same volumetric setting, kept in step."
+            },
+            {
+              "key": "WaterCausticsMode@0",
+              "value": "Off",
+              "label": "Water caustics",
+              "why": "Turns off light patterns under water."
+            },
+            {
+              "key": "WaterWaveWetness@0",
+              "value": "false",
+              "label": "Water wave wetness",
+              "values": {
+                "true": "On",
+                "false": "Off"
+              },
+              "why": "Turns off wet surfaces from waves."
+            },
+            {
+              "key": "WeatherGridVolumesQuality@0",
+              "value": "Off",
+              "label": "Weather grid volumes",
+              "why": "Turns off weather volumes for more frames."
+            },
+            {
+              "key": "WorldStreamingQuality@0",
+              "value": "Low",
+              "label": "On-demand texture streaming",
+              "why": "Streams less data while you play, for fewer hitches."
+            },
+            {
+              "key": "DeferredPhysics@0",
+              "value": "Low Quality",
+              "label": "Deferred physics quality",
+              "values": {
+                "Low Quality": "Low"
+              },
+              "why": "Cheaper physics effects for more frames."
+            },
+            {
+              "key": "PersistentDamageLayer@0",
+              "value": "false",
+              "label": "Persistent damage",
+              "values": {
+                "true": "On",
+                "false": "Off"
+              },
+              "why": "Turns off lasting damage decals."
+            },
+            {
+              "key": "BulletImpacts@0",
+              "value": "false",
+              "label": "Bullet impacts",
+              "values": {
+                "true": "On",
+                "false": "Off"
+              },
+              "why": "Fewer impact effects for more frames and less clutter."
+            },
+            {
+              "key": "DxrMode@0",
+              "value": "Off",
+              "label": "Ray tracing",
+              "why": "Ray tracing costs a lot of frames."
+            },
+            {
+              "key": "DxrMode@1",
+              "value": "Off",
+              "label": "Ray tracing quality",
+              "why": "Keeps ray tracing fully off."
+            },
+            {
+              "key": "VRS@0",
+              "value": "true",
+              "label": "Variable rate shading",
+              "values": {
+                "true": "On",
+                "false": "Off"
+              },
+              "why": "Shades less detail where you won't notice it, for more frames."
+            },
+            {
+              "key": "ReflectionProbeHalfResolution@0",
+              "value": "true",
+              "label": "Half-resolution reflections",
+              "values": {
+                "true": "On",
+                "false": "Off"
+              },
+              "why": "Cheaper reflections for more frames. Not in the game's menu."
+            },
+            {
+              "key": "DofEnable@0",
+              "value": "Off",
+              "label": "Depth of field",
+              "why": "Keeps the whole screen in focus."
+            },
+            {
+              "key": "DofWeaponDisable@0",
+              "value": "true",
+              "label": "Weapon depth of field off",
+              "values": {
+                "true": "On",
+                "false": "Off"
+              },
+              "why": "Stops your weapon going blurry."
+            },
+            {
+              "key": "DofWorldDisable@0",
+              "value": "true",
+              "label": "World depth of field off",
+              "values": {
+                "true": "On",
+                "false": "Off"
+              },
+              "why": "Stops the background going blurry when you aim."
+            },
+            {
+              "key": "MotionBlur@0",
+              "value": "Off",
+              "label": "World motion blur",
+              "why": "Motion blur smears the screen when you turn."
+            },
+            {
+              "key": "WeaponMotionBlur@0",
+              "value": "false",
+              "label": "Weapon motion blur",
+              "values": {
+                "true": "On",
+                "false": "Off"
+              },
+              "why": "Stops your weapon smearing when you move."
             }
           ]
         }
       ],
-      "rev": "42a198db"
+      "rev": "adcb2271"
     },
     {
       "slug": "cs2",
