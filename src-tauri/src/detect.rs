@@ -50,7 +50,51 @@ impl Pc {
     }
 
     pub fn is_running(&self, game: &Game) -> bool {
-        game.process.iter().any(|p| self.running.contains(&p.to_ascii_lowercase()))
+        self.process_running(&game.process)
+    }
+
+    /// True when any exe from a game's `process` list (games/*.json) is in this snapshot.
+    /// Snapshot names are lowercase; catalog names are compared the same way.
+    pub fn process_running(&self, process: &[String]) -> bool {
+        process.iter().any(|p| self.running.contains(&exe_key(p)))
+    }
+
+    /// One block per game whose exe is running. The message is what apply returns.
+    pub fn apply_blocks(&self, games: &[Game]) -> Vec<ApplyBlock> {
+        games.iter().filter_map(|g| self.apply_block(g)).collect()
+    }
+
+    pub fn apply_block(&self, game: &Game) -> Option<ApplyBlock> {
+        self.is_running(game).then(|| ApplyBlock { slug: game.slug.clone(), message: close_before_applying(&game.name) })
+    }
+}
+
+/// A game the UI must not apply while its exe is open.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApplyBlock {
+    pub slug: String,
+    pub message: String,
+}
+
+/// Shown on the Apply button and returned by apply, so both say the same thing.
+pub fn close_before_applying(name: &str) -> String {
+    format!("Close {name} before applying — the config can't be applied while the game is running.")
+}
+
+/// Lowercase exe name, the form `running_exes` stores.
+fn exe_key(name: &str) -> String {
+    name.to_ascii_lowercase()
+}
+
+/// Lowercase exe names of processes running right now. Empty off Windows.
+pub fn running_exes() -> HashSet<String> {
+    #[cfg(windows)]
+    {
+        windows::running_processes()
+    }
+    #[cfg(not(windows))]
+    {
+        HashSet::new()
     }
 }
 
@@ -279,7 +323,7 @@ mod windows {
         }
     }
 
-    fn running_processes() -> HashSet<String> {
+    pub(super) fn running_processes() -> HashSet<String> {
         use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
         use windows_sys::Win32::System::Diagnostics::ToolHelp::{
             CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
@@ -296,7 +340,7 @@ mod windows {
             let mut more = Process32FirstW(snap, &mut entry) != 0;
             while more {
                 let len = entry.szExeFile.iter().position(|&c| c == 0).unwrap_or(entry.szExeFile.len());
-                out.insert(String::from_utf16_lossy(&entry.szExeFile[..len]).to_lowercase());
+                out.insert(super::exe_key(&String::from_utf16_lossy(&entry.szExeFile[..len])));
                 more = Process32NextW(snap, &mut entry) != 0;
             }
             CloseHandle(snap);
@@ -373,5 +417,54 @@ mod tests {
         .unwrap();
         assert_eq!(steam_userdata(&steam), Some(steam.join("userdata/22222222")));
         std::fs::remove_dir_all(steam).unwrap();
+    }
+
+    fn game(slug: &str, name: &str, process: &[&str]) -> Game {
+        serde_json::from_value(serde_json::json!({
+            "slug": slug,
+            "name": name,
+            "tile": "TG",
+            "launcher": "other",
+            "process": process,
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_running_exe_blocks_only_the_game_that_lists_it() {
+        let cs = game("cs2", "Counter-Strike 2", &["cs2.exe"]);
+        let fortnite = game("fortnite", "Fortnite", &["FortniteClient-Win64-Shipping.exe"]);
+        let quiet = game("quiet", "Quiet", &[]);
+        let idle = Pc::default();
+        assert!(!idle.is_running(&cs));
+        assert!(idle.apply_blocks(&[cs.clone(), fortnite.clone()]).is_empty());
+
+        // Snapshot names are lowercase. Catalog names keep the casing from games/*.json.
+        let pc = Pc { running: HashSet::from(["cs2.exe".into(), "steam.exe".into()]), ..Pc::default() };
+        assert!(pc.is_running(&cs));
+        assert!(!pc.is_running(&fortnite), "a different game's exe does not count");
+        assert!(!pc.is_running(&quiet), "no process list never matches");
+        let blocks = pc.apply_blocks(&[cs.clone(), fortnite.clone(), quiet]);
+        assert_eq!(
+            blocks,
+            vec![ApplyBlock {
+                slug: "cs2".into(),
+                message: "Close Counter-Strike 2 before applying — the config can't be applied while the game is running.".into(),
+            }]
+        );
+
+        let either = game("call-of-duty", "Call of Duty", &["cod.exe", "ModernWarfare.exe"]);
+        let helper = Pc { running: HashSet::from(["modernwarfare.exe".into()]), ..Pc::default() };
+        assert!(helper.is_running(&either), "any listed exe blocks the game");
+        assert!(!helper.is_running(&cs));
+        assert!(!pc.process_running(&["cs2_helper.exe".into()]), "names have to match the whole exe");
+    }
+
+    #[test]
+    fn close_before_applying_names_the_game() {
+        assert_eq!(
+            close_before_applying("Overwatch 2"),
+            "Close Overwatch 2 before applying — the config can't be applied while the game is running."
+        );
     }
 }
