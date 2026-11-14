@@ -14,6 +14,10 @@ let appVersion = "1.0.0";
 let busy = false;
 let armedRevert = null; // Revert is two-step: first click arms it for 3 s
 let drawerSlug = null;
+// Windows tweak profiles, each tweak's state read live from the registry by the engine.
+let profiles = [];
+let drawerProfile = null;
+let armedReset = null; // Reset is two-step, like Revert
 
 // ---------- helpers ----------
 
@@ -236,6 +240,105 @@ function render() {
   }));
 }
 
+// ---------- Windows tweaks ----------
+
+const TWEAK_STATE = { applied: "Applied", default: "Windows default", other: "Changed elsewhere" };
+const touched = (p) => p.tweaks.some((t) => t.state !== "default");
+const initials = (name) => name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+
+function profileBadge(p) {
+  const done = p.applied === p.total;
+  const b = el("span", `badge ${done ? "ok" : ""}`.trim());
+  if (done) b.append(icon("check"));
+  b.append(done ? "Applied" : p.applied ? `${p.applied} of ${p.total} applied` : "Not applied");
+  return b;
+}
+
+function resetButton(scope, label) {
+  const armed = armedReset === scope;
+  return button(armed ? "Confirm reset" : label, armed ? "btn-danger" : "btn-ghost", () => {
+    if (armed) return resetTweaks(scope);
+    armedReset = scope;
+    rerender();
+    setTimeout(() => {
+      if (armedReset === scope) { armedReset = null; rerender(); }
+    }, 3000);
+  });
+}
+
+function profileCard(p) {
+  const c = el("article", "card");
+  const head = el("div", "card-head");
+  const info = el("div", "card-info");
+  info.append(el("div", "card-name", p.name), el("div", "card-summary", p.summary));
+  head.append(tile({ tile: initials(p.name) }, p.applied === p.total ? "lit" : ""), info);
+
+  const status = el("div", "card-status");
+  status.append(profileBadge(p), el("span", null, `${plural(p.total, "tweak")}${p.admin ? " · asks for administrator" : ""}`));
+
+  const actions = el("div", "card-actions");
+  actions.append(button("Details", "btn-ghost", () => openProfile(p.id)));
+  if (touched(p)) actions.append(resetButton(p.id, "Reset"));
+  if (p.applied < p.total) actions.append(button("Apply", "btn-outline", () => applyProfile(p)));
+  c.append(head, status, actions);
+  return c;
+}
+
+function renderTweaks() {
+  $("tweaks").replaceChildren(...profiles.map(profileCard));
+  const all = $("tweaks-reset-all");
+  const armed = armedReset === "all";
+  all.hidden = !profiles.length;
+  all.textContent = armed ? "Confirm reset" : "Reset all to Windows defaults";
+  all.className = `btn ${armed ? "btn-danger" : "btn-ghost"}`;
+}
+
+function openProfile(id) {
+  drawerProfile = id;
+  drawerSlug = null;
+  renderDrawer();
+  if (!$("drawer").open) $("drawer").showModal();
+}
+
+function renderProfileDrawer(p) {
+  const d = $("drawer");
+  const head = el("div", "drawer-head");
+  const titles = el("div", "titles");
+  const h = el("h2", null, `${p.name} profile`);
+  h.id = "drawer-title";
+  titles.append(h, el("div", "meta", `${plural(p.total, "Windows tweak")} · every value shown`));
+  const close = el("button", "btn btn-ghost btn-icon");
+  close.type = "button";
+  close.setAttribute("aria-label", "Close");
+  close.append(icon("x"));
+  close.onclick = () => d.close();
+  head.append(tile({ tile: initials(p.name) }, p.applied === p.total ? "lit" : ""), titles, profileBadge(p), close);
+
+  const body = el("div", "drawer-body");
+  const note = el("p", "note");
+  note.append(icon("shield"), "These are Windows registry settings. Reset puts each one back to the Windows default, whether this app or the playbook set it.");
+  const rows = [];
+  for (const t of p.tweaks) {
+    const group = el("tr", "group");
+    const label = labelCell(t.name, `${t.why}${t.restart ? " Needs a restart." : ""}`);
+    label.colSpan = 3;
+    group.append(label, el("td", t.state === "applied" ? "match" : "now", TWEAK_STATE[t.state] ?? t.state));
+    rows.push(group);
+    for (const v of t.values) {
+      const tr = el("tr", "value");
+      tr.append(el("td", null, v.name), el("td", null, v.now), el("td", null, v.set), el("td", null, v.default));
+      rows.push(tr);
+    }
+  }
+  body.append(note, settingsTable(rows, ["Setting", "Now", "Set to", "Windows default"]));
+
+  const foot = el("div", "drawer-foot");
+  if (touched(p)) foot.append(resetButton(p.id, "Reset to Windows defaults"));
+  if (p.applied < p.total) foot.append(button(`Apply ${p.name}`, "btn-primary", () => applyProfile(p)));
+  else foot.append(button("Close", "", () => d.close()));
+  d.replaceChildren(head, body, foot);
+}
+
 // ---------- details drawer ----------
 
 function openDrawer(slug) {
@@ -263,8 +366,13 @@ function labelCell(label, why) {
 }
 
 function renderDrawer() {
-  const g = view.games.find((x) => x.slug === drawerSlug);
   const d = $("drawer");
+  if (drawerProfile) {
+    const p = profiles.find((x) => x.id === drawerProfile);
+    if (p) return renderProfileDrawer(p);
+    drawerProfile = null;
+  }
+  const g = view.games.find((x) => x.slug === drawerSlug);
   if (!g) { if (d.open) d.close(); return; }
 
   const head = el("div", "drawer-head");
@@ -472,6 +580,7 @@ function renderSheet() {
 
 function rerender() {
   render();
+  renderTweaks();
   renderLibraries();
   if ($("drawer").open) renderDrawer();
   if ($("sheet").open) renderSheet();
@@ -495,8 +604,39 @@ async function scan() {
     toast(`Scan failed: ${errText(e)}`, "error");
     return;
   }
+  try {
+    profiles = (await invoke("tweaks_scan")).profiles;
+  } catch (e) {
+    profiles = [];
+    toast(`Couldn't read the Windows tweaks: ${errText(e)}`, "error");
+  }
   rerender();
 }
+
+// Windows shows its permission prompt during these when a tweak covers the whole PC.
+const restartNote = (list) => (list.some((t) => t.restart) ? " Restart Windows to finish." : "");
+
+const applyProfile = (p) => run(async () => {
+  try {
+    const r = await invoke("tweaks_apply", { profile: p.id });
+    toast(`${p.name} applied. ${plural(r.changed, "setting")} changed.${r.changed ? restartNote(p.tweaks) : ""}`, "ok");
+  } catch (e) {
+    toast(errText(e), "error");
+  }
+  await scan();
+});
+
+const resetTweaks = (scope) => run(async () => {
+  armedReset = null;
+  const list = scope === "all" ? profiles.flatMap((p) => p.tweaks) : profiles.find((p) => p.id === scope)?.tweaks ?? [];
+  try {
+    const r = await invoke("tweaks_reset", { scope });
+    toast(`Back to Windows defaults. ${plural(r.changed, "setting")} changed.${r.changed ? restartNote(list) : ""}`, "ok");
+  } catch (e) {
+    toast(errText(e), "error");
+  }
+  await scan();
+});
 
 // Process check only, every few seconds and whenever the window is focused again.
 // A full scan re-reads every config file; this just asks which exes are open.
@@ -755,13 +895,21 @@ async function checkAppUpdate() {
 $("rescan-btn").onclick = () => run(scan);
 $("library-btn").onclick = openSheet;
 $("optimize-all").onclick = optimizeAll;
+$("tweaks-reset-all").onclick = () => {
+  if (armedReset === "all") return resetTweaks("all");
+  armedReset = "all";
+  rerender();
+  setTimeout(() => {
+    if (armedReset === "all") { armedReset = null; rerender(); }
+  }, 3000);
+};
 for (const b of document.querySelectorAll("[data-url]")) b.onclick = () => openUrl(b.dataset.url);
 for (const d of [$("drawer"), $("sheet")]) {
   // A click that lands on the dialog itself is a click on its backdrop
   d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
 }
 $("sheet").querySelector("[data-close]").onclick = () => $("sheet").close();
-$("drawer").addEventListener("close", () => (drawerSlug = null));
+$("drawer").addEventListener("close", () => { drawerSlug = null; drawerProfile = null; });
 
 (async () => {
   appVersion = await window.__TAURI__.app.getVersion().catch(() => appVersion);

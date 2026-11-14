@@ -1,0 +1,117 @@
+{
+  "profiles": [
+    {
+      "id": "esports",
+      "name": "Esports Pro",
+      "summary": "Everything for the lowest latency. Turns off game capture and mouse acceleration.",
+      "tweaks": ["game-priority", "foreground-boost", "network-throttle-off", "gpu-scheduling", "mouse-accel-off", "game-capture-off", "game-mode-on", "menu-delay-off"]
+    },
+    {
+      "id": "casual",
+      "name": "Casual Gamer",
+      "summary": "The safe wins. Keeps clips and capture working.",
+      "tweaks": ["game-priority", "gpu-scheduling", "game-mode-on"]
+    },
+    {
+      "id": "security",
+      "name": "Security",
+      "summary": "Turns Windows' virtualization protections back on. Valorant and FACEIT expect them.",
+      "tweaks": ["vbs-on", "memory-integrity-on"]
+    }
+  ],
+  "tweaks": [
+    {
+      "id": "game-priority",
+      "name": "Game scheduling priority",
+      "why": "Windows reserves less CPU for background work and gives game threads a higher priority.",
+      "restart": true,
+      "values": [
+        { "hive": "HKLM", "key": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile", "name": "SystemResponsiveness", "type": "dword", "set": "10", "default": "20" },
+        { "hive": "HKLM", "key": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games", "name": "Priority", "type": "dword", "set": "6", "default": "2" },
+        { "hive": "HKLM", "key": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games", "name": "Scheduling Category", "type": "sz", "set": "High", "default": "Medium" },
+        { "hive": "HKLM", "key": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games", "name": "SFIO Priority", "type": "sz", "set": "High", "default": "Normal" }
+      ]
+    },
+    {
+      "id": "foreground-boost",
+      "name": "Foreground boost",
+      "why": "The window you're playing in gets short, boosted CPU time slices.",
+      "restart": true,
+      "values": [
+        { "hive": "HKLM", "key": "SYSTEM\\CurrentControlSet\\Control\\PriorityControl", "name": "Win32PrioritySeparation", "type": "dword", "set": "38", "default": "2" }
+      ]
+    },
+    {
+      "id": "network-throttle-off",
+      "name": "Network throttling off",
+      "why": "Removes the packet limit Windows applies while media is playing.",
+      "restart": true,
+      "values": [
+        { "hive": "HKLM", "key": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile", "name": "NetworkThrottlingIndex", "type": "dword", "set": "4294967295", "default": "10" }
+      ]
+    },
+    {
+      "id": "gpu-scheduling",
+      "name": "Hardware-accelerated GPU scheduling",
+      "why": "The GPU schedules its own work, which frame generation also needs.",
+      "restart": true,
+      "values": [
+        { "hive": "HKLM", "key": "SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers", "name": "HwSchMode", "type": "dword", "set": "2", "default": null }
+      ]
+    },
+    {
+      "id": "mouse-accel-off",
+      "name": "Mouse acceleration off",
+      "why": "The cursor moves the same distance for the same hand movement, every time.",
+      "values": [
+        { "hive": "HKCU", "key": "Control Panel\\Mouse", "name": "MouseSpeed", "type": "sz", "set": "0", "default": "1" },
+        { "hive": "HKCU", "key": "Control Panel\\Mouse", "name": "MouseThreshold1", "type": "sz", "set": "0", "default": "6" },
+        { "hive": "HKCU", "key": "Control Panel\\Mouse", "name": "MouseThreshold2", "type": "sz", "set": "0", "default": "10" }
+      ]
+    },
+    {
+      "id": "game-capture-off",
+      "name": "Game capture off",
+      "why": "Background recording costs frames. This also turns off Game Bar clips.",
+      "values": [
+        { "hive": "HKCU", "key": "System\\GameConfigStore", "name": "GameDVR_Enabled", "type": "dword", "set": "0", "default": "1" },
+        { "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\GameDVR", "name": "AppCaptureEnabled", "type": "dword", "set": "0", "default": null },
+        { "hive": "HKLM", "key": "SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR", "name": "AllowGameDVR", "type": "dword", "set": "0", "default": null }
+      ]
+    },
+    {
+      "id": "game-mode-on",
+      "name": "Game Mode on",
+      "why": "Windows holds back updates and background work while a game is running.",
+      "values": [
+        { "hive": "HKCU", "key": "Software\\Microsoft\\GameBar", "name": "AutoGameModeEnabled", "type": "dword", "set": "1", "default": null }
+      ]
+    },
+    {
+      "id": "menu-delay-off",
+      "name": "Menus open instantly",
+      "why": "Removes the 400 ms pause before menus open.",
+      "values": [
+        { "hive": "HKCU", "key": "Control Panel\\Desktop", "name": "MenuShowDelay", "type": "sz", "set": "0", "default": "400" }
+      ]
+    },
+    {
+      "id": "vbs-on",
+      "name": "Virtualization-based security on",
+      "why": "Isolates the most sensitive parts of Windows. Vanguard and FACEIT can require it.",
+      "restart": true,
+      "values": [
+        { "hive": "HKLM", "key": "SYSTEM\\CurrentControlSet\\Control\\DeviceGuard", "name": "EnableVirtualizationBasedSecurity", "type": "dword", "set": "1", "default": null }
+      ]
+    },
+    {
+      "id": "memory-integrity-on",
+      "name": "Memory Integrity on",
+      "why": "Blocks unsigned drivers from running in the kernel.",
+      "restart": true,
+      "values": [
+        { "hive": "HKLM", "key": "SYSTEM\\CurrentControlSet\\Control\\DeviceGuard\\Scenarios\\HypervisorEnforcedCodeIntegrity", "name": "Enabled", "type": "dword", "set": "1", "default": "1" }
+      ]
+    }
+  ]
+}

@@ -11,6 +11,7 @@ I optimize gaming PCs at [ChamberTech](https://www.chambertech.net). This app do
 - **Shows its work.** For every setting you see your value, mine, and one line on why.
 - **Catches resets.** When a game update puts something back, the card says so, and Re-apply fixes it.
 - **Reverts exactly.** If nothing else touched the file, you get the original back byte for byte. If the game or you changed other things since, only my settings are undone and yours stay.
+- **Tunes Windows too, if you want.** Pick a profile (Esports Pro, Casual Gamer, or Security) and the app sets the matching Windows settings. No playbook needed. Reset puts them back to the Windows defaults, including on a PC the playbook tuned.
 - **Gets new configs.** New and improved configs download from a public signed catalog when the app opens. No reinstall.
 
 ## Supported games
@@ -25,13 +26,50 @@ I optimize gaming PCs at [ChamberTech](https://www.chambertech.net). This app do
 
 More are in progress in [`games/drafts`](games/drafts).
 
+## Windows tweaks
+
+Not everyone wants a full playbook install, and some people who ran it want a setting back. The Windows tweaks section covers both.
+
+| Profile | What it's for |
+|---|---|
+| Esports Pro | Everything for the lowest latency. Turns off game capture and mouse acceleration. |
+| Casual Gamer | The safe wins. Clips and capture keep working. |
+| Security | Turns virtualization-based security and Memory Integrity back on. Valorant and FACEIT expect them. |
+
+Every tweak is a registry value with two sides: what the tweak sets, and the Windows default. Apply writes the first. Reset writes the second. Reset doesn't depend on a record of what the app did, so it also undoes those same values after the playbook set them. It can't bring back services or apps the playbook removed: that takes a Windows reinstall.
+
+The tweaks live in [`tweaks.json`](tweaks.json). To add one, add an entry under `tweaks` and list its id in the profiles that should apply it:
+
+```json
+{
+  "id": "foreground-boost",
+  "name": "Foreground boost",
+  "why": "The window you're playing in gets short, boosted CPU time slices.",
+  "restart": true,
+  "values": [
+    { "hive": "HKLM", "key": "SYSTEM\\CurrentControlSet\\Control\\PriorityControl", "name": "Win32PrioritySeparation", "type": "dword", "set": "38", "default": "2" }
+  ]
+}
+```
+
+- `hive` is `HKCU` (this player, no prompt) or `HKLM` (the whole PC, Windows asks for permission).
+- `type` is `dword` (a number in decimal) or `sz` (short text).
+- `set` is what Apply writes. `default` is what Reset writes. `null` on either side means "remove the value".
+- A new profile is one more entry under `profiles`.
+
+`cargo test` checks the file. A tweak can only touch keys under the roots listed in `HKLM_ROOTS` and `HKCU_ROOTS` in [`src-tauri/src/tweaks.rs`](src-tauri/src/tweaks.rs). A key outside them fails the test until you add its root there. That is deliberate: the list is where you stop and check what else lives under a key.
+
+Check each `default` on a stock Windows install before you ship it. A wrong default makes Reset write the wrong value.
+
 ## The numbers
 
 Each game shows my before and after once I've benchmarked it: average FPS and 1% lows, with the rig and the method. Until then the app shows no performance claim. No number, no claim.
 
 ## Why it's safe
 
-- **Config files only.** These are the same files the game's own menu writes. Nothing is injected or left running, and the app never asks for admin rights.
+- **Config files only, for games.** These are the same files the game's own menu writes. Nothing is injected or left running.
+- **Admin only when you ask.** The app runs without admin rights. Windows shows its permission prompt only when you apply or reset a tweak that covers the whole PC. The step that runs with those rights takes a profile name and nothing else, and it can only write the values compiled into the app.
+- **Windows tweaks aren't downloaded.** They ship inside the app, so a config update can never change a Windows setting. Each one is a number or a short word under an allowed registry key. Paths, programs, and startup entries are rejected.
 - **Safe settings only.** Most values are ones the game's settings menu already offers. A few only exist in the config file, like Call of Duty's renderer threads. I use those only where players commonly change them and the game isn't known to flag it, and each one says why.
 - **Signed configs.** Config updates are signed with a key that never touches GitHub, so a hacked repo or account can't push configs to your PC. The app refuses anything unsigned or older than what it already has.
 - **Locked to config files.** A config can only point at settings files (`.ini`, `.cfg`, `.vcfg`, `.txt`, `.txt0`, `.txt1`, and Battlefield's `PROFSAVE_profile`) under your user folders or a game's install folder. System paths, `..` tricks, and programs are rejected before anything is read.
@@ -78,6 +116,10 @@ You need [Rust](https://rustup.rs) and Node.
 - Run the app on Windows: `npx @tauri-apps/cli@2.12.4 dev`
 - Build the installer: `npx @tauri-apps/cli@2.12.4 build -- --locked`
 - Preview the UI in any browser with sample data: `python3 -m http.server --directory ui`
+
+## Questions
+
+Email [chamber@chambertech.net](mailto:chamber@chambertech.net).
 
 ## Credits
 

@@ -423,11 +423,11 @@ fn is_device_name(seg: &str) -> bool {
         || (stem.len() == 4 && (stem.starts_with("COM") || stem.starts_with("LPT")) && stem.ends_with(|c: char| c.is_ascii_digit()))
 }
 
-fn is_slug(s: &str) -> bool {
+pub(crate) fn is_slug(s: &str) -> bool {
     !s.is_empty() && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
-fn is_text(s: &str) -> bool {
+pub(crate) fn is_text(s: &str) -> bool {
     !s.trim().is_empty() && !s.chars().any(char::is_control)
 }
 

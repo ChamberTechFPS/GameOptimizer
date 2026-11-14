@@ -121,7 +121,40 @@
   // ?accepted skips the first-launch terms screen
   const mockState = { terms: location.search.includes("accepted") ? 99 : 0, libraries: [] };
   const find = (slug) => games.find((g) => g.slug === slug);
+  // Windows tweak profiles: sample data shaped like tweaks::scan.
+  const tw = (id, name, why, admin, values, restart = false) => ({ id, name, why, admin, restart, values });
+  const val = (name, now, set, def) => ({ name, now, set, default: def });
+  const tweakList = [
+    tw("game-priority", "Game scheduling priority", "Windows reserves less CPU for background work.", true, [val("SystemResponsiveness", "20", "10", "20"), val("Priority", "2", "6", "2")], true),
+    tw("mouse-accel-off", "Mouse acceleration off", "The cursor moves the same distance for the same hand movement.", false, [val("MouseSpeed", "0", "0", "1")]),
+    tw("game-mode-on", "Game Mode on", "Windows holds back background work while a game runs.", false, [val("AutoGameModeEnabled", "Not set", "1", "Not set")]),
+    tw("vbs-on", "Virtualization-based security on", "Vanguard and FACEIT can require it.", true, [val("EnableVirtualizationBasedSecurity", "1", "1", "Not set")], true),
+  ];
+  const profileList = [
+    { id: "esports", name: "Esports Pro", summary: "Everything for the lowest latency.", tweaks: ["game-priority", "mouse-accel-off", "game-mode-on"] },
+    { id: "casual", name: "Casual Gamer", summary: "The safe wins. Keeps clips working.", tweaks: ["game-priority", "game-mode-on"] },
+    { id: "security", name: "Security", summary: "Turns Windows' protections back on.", tweaks: ["vbs-on"] },
+  ];
+  const tweakState = (t) => (t.values.every((v) => v.now === v.set) ? "applied" : t.values.every((v) => v.now === v.default) ? "default" : "other");
+  const tweaksOf = (scope) => tweakList.filter((t) => scope === "all" || profileList.find((p) => p.id === scope).tweaks.includes(t.id));
+  const writeTweaks = (scope, field) => {
+    if (location.search.includes("uac=no")) throw new Error("You said no at the Windows permission prompt, so the whole-PC tweaks weren't changed.");
+    let changed = 0;
+    for (const v of tweaksOf(scope).flatMap((t) => t.values)) {
+      if (v.now !== v[field]) { v.now = v[field]; changed++; }
+    }
+    return { changed };
+  };
+
   const commands = {
+    tweaks_scan: () => ({
+      profiles: profileList.map((p) => {
+        const tweaks = tweaksOf(p.id).map((t) => ({ ...t, state: tweakState(t) }));
+        return { id: p.id, name: p.name, summary: p.summary, total: tweaks.length, applied: tweaks.filter((t) => t.state === "applied").length, admin: tweaks.some((t) => t.admin), tweaks };
+      }),
+    }),
+    tweaks_apply: ({ profile }) => writeTweaks(profile, "set"),
+    tweaks_reset: ({ scope }) => writeTweaks(scope, "default"),
     scan: () => ({ games: games.map(view), terms: mockState.terms, libraries: mockState.libraries }),
     accept_terms: ({ version }) => { mockState.terms = version; return {}; },
     add_library: ({ path }) => { if (!mockState.libraries.includes(path)) mockState.libraries.push(path); return {}; },

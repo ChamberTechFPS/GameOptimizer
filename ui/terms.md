@@ -1,12 +1,16 @@
 # Terms of use
 
-Version 3 · Updated 2026-11-03
+Version 4 · Updated 2026-11-14
 
 FPS Optimizer is made by ChamberTech LLC. I'm Campbell, and I run it. These terms are between you and ChamberTech LLC. When you click Accept, you agree to them. If you don't agree, click Decline and the app closes.
 
 ## What the app does
 
 It finds supported games on your PC and changes settings in their config files. These are the same files the game's own settings menu writes. Before it changes a file the first time, it backs up the original. Every change can be reverted from the app.
+
+## Windows settings
+
+If you apply a Windows tweak profile, the app also changes Windows registry settings. It shows each value before you apply it. Some of these cover the whole PC, and Windows asks for your permission first. Reset puts those settings back to the Windows defaults, not to whatever you had before. Some need a restart to take effect. A Windows setting can change how games, anti-cheat, or other software behave.
 
 ## Free to use
 
@@ -40,7 +44,7 @@ ChamberTech LLC isn't affiliated with or endorsed by any game publisher, launche
 
 ## Stopping
 
-You can stop any time. To undo my settings in a game, click Revert. Then uninstall the app. Your backups stay in the folder above until you delete them.
+You can stop any time. To undo my settings in a game, click Revert. To undo Windows tweaks, click Reset all to Windows defaults. Then uninstall the app. Your backups stay in the folder above until you delete them.
 
 ## Changes to these terms
 

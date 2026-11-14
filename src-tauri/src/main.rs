@@ -4,6 +4,7 @@ mod catalog;
 mod detect;
 mod engine;
 mod patch;
+mod tweaks;
 
 use detect::Pc;
 use engine::Engine;
@@ -100,7 +101,29 @@ async fn install_catalog(app: State<'_, App>, json: Vec<u8>, sig: Vec<u8>) -> Re
     with(&app, |e| e.install_catalog(&json, &sig).map(|status| json!({ "status": status })))
 }
 
+/// Windows tweak profiles and each tweak's state right now, read from the registry.
+#[tauri::command]
+async fn tweaks_scan() -> Reply {
+    Ok(json!({ "profiles": tweaks::scan()? }))
+}
+
+/// Apply a profile. The whole-PC tweaks go through the Windows permission prompt.
+#[tauri::command]
+async fn tweaks_apply(profile: String) -> Reply {
+    Ok(json!({ "changed": tweaks::run(tweaks::Action::Apply, &profile)? }))
+}
+
+/// Put a profile's tweaks, or every tweak for "all", back to the Windows defaults.
+#[tauri::command]
+async fn tweaks_reset(scope: String) -> Reply {
+    Ok(json!({ "changed": tweaks::run(tweaks::Action::Reset, &scope)? }))
+}
+
 fn main() {
+    // The copy of the app started through the Windows permission prompt does one job and exits.
+    if let Some(code) = tweaks::elevated_entry(&std::env::args().collect::<Vec<_>>()) {
+        std::process::exit(code);
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -123,6 +146,9 @@ fn main() {
             accept_terms,
             add_library,
             remove_library,
+            tweaks_scan,
+            tweaks_apply,
+            tweaks_reset,
             quit
         ])
         .run(tauri::generate_context!())
