@@ -7,10 +7,10 @@ use rsa::{BigUint, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// RSA public moduli (hex, e = 65537) that may sign `catalog.json`. Private keys stay offline
-/// with the maintainer (example: F:\GameOptimizer\signing\catalog-signing.key) and are never
+/// with the maintainer (on encrypted removable media, never on a path named here) and are never
 /// committed, so a compromised repo or GitHub account can't ship configs.
 ///
 /// `CURRENT_MODULUS_HEX` is the offline RSA-4096 key `rebuild` trusts, and it signs new catalogs.
@@ -332,13 +332,24 @@ pub fn check_path(path: &str, is_file: bool) -> Result<(), String> {
             return Err(format!("unsafe path segment {seg:?} in {path}"));
         }
     }
-    if is_file {
-        let ext = segments.last().and_then(|s| s.rsplit_once('.')).map(|(_, e)| e.to_ascii_lowercase());
-        if !ext.is_some_and(|e| EXTENSIONS.contains(&e.as_str())) && !segments.last().is_some_and(|s| FILE_NAMES.contains(s)) {
-            return Err(format!("not a config file type: {path}"));
-        }
+    if is_file && !segments.last().is_some_and(|s| is_config_name(s)) {
+        return Err(format!("not a config file type: {path}"));
     }
     Ok(())
+}
+
+fn is_config_name(name: &str) -> bool {
+    let ext = name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase());
+    ext.is_some_and(|e| EXTENSIONS.contains(&e.as_str())) || FILE_NAMES.contains(&name)
+}
+
+/// True when a path on disk names a settings file type the catalog could have listed. Revert
+/// uses this on paths read back from state.json, which anything running as the player can edit.
+pub fn is_config_file(path: &Path) -> bool {
+    use std::path::Component;
+    path.is_absolute()
+        && !path.components().any(|c| matches!(c, Component::ParentDir | Component::CurDir))
+        && path.file_name().and_then(|n| n.to_str()).is_some_and(is_config_name)
 }
 
 fn split_token(path: &str) -> Option<(&str, &str)> {
@@ -402,6 +413,14 @@ fn is_segment(seg: &str) -> bool {
     seg.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
         && seg.chars().all(|c| c.is_ascii_alphanumeric() || " ._()-".contains(c))
         && !seg.ends_with(['.', ' '])
+        && !is_device_name(seg)
+}
+
+/// Windows device names (`NUL`, `CON.txt`, `COM1.ini`): opening one talks to a device, not a file.
+fn is_device_name(seg: &str) -> bool {
+    let stem = seg.split('.').next().unwrap_or_default().trim_end().to_ascii_uppercase();
+    matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || (stem.len() == 4 && (stem.starts_with("COM") || stem.starts_with("LPT")) && stem.ends_with(|c: char| c.is_ascii_digit()))
 }
 
 fn is_slug(s: &str) -> bool {
@@ -446,7 +465,6 @@ fn is_exe(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
 
     // Throwaway 2048-bit test keys, generated for these tests only (private halves were discarded).
     // They are not in TRUSTED_MODULI. Key B stands in for a spare key during a rotation.
@@ -511,9 +529,32 @@ mod tests {
             "{localappdata}/x.ini.",
             "{localappdata}//x.ini",
             "localappdata/x.ini",
+            "{localappdata}/NUL.ini",
+            "{documents}/con/settings.ini",
+            "{documents}/Game/COM1.txt",
+            "{documents}/Game/lpt9.cfg",
         ] {
             assert!(check_path(bad, true).is_err(), "{bad} should be rejected");
         }
+    }
+
+    #[test]
+    fn device_names_are_not_files_but_lookalikes_are() {
+        for ok in ["Console.ini", "COM10.ini", "config.txt", "Nullsoft.cfg", "COMX.ini"] {
+            assert!(check_path(&format!("{{documents}}/Game/{ok}"), true).is_ok(), "{ok}");
+        }
+    }
+
+    #[test]
+    fn paths_from_state_must_be_absolute_config_files() {
+        let root = std::env::temp_dir();
+        assert!(is_config_file(&root.join("Game/settings.ini")));
+        assert!(is_config_file(&root.join("Game/s.1.0.cod26.TXT0")));
+        assert!(is_config_file(&root.join("bf/PROFSAVE_profile")));
+        assert!(!is_config_file(&root.join("Startup/run.bat")));
+        assert!(!is_config_file(&root.join("Game/game.exe")));
+        assert!(!is_config_file(&root.join("Game/../settings.ini")));
+        assert!(!is_config_file(Path::new("settings.ini")), "relative");
     }
 
     #[test]
@@ -705,7 +746,7 @@ mod tests {
              CURRENT_MODULUS_HEX (the private key is not in this repo). Do not generate a\n\
              new key unless that private key is lost.\n\
              \n\
-             node tools/sign-catalog.mjs F:\\GameOptimizer\\signing\\catalog-signing.key\n\
+             node tools/sign-catalog.mjs <path-to-key>\n\
              node tools/verify-catalog.mjs\n\
              \n\
              The openssl commands and the full diagnosis are in RELEASING.md."

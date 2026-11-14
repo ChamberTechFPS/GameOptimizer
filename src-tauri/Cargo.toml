@@ -1,7 +1,7 @@
 [package]
-name = "chamber-game-optimizer"
-version = "1.0.0-beta.5"
-description = "ChamberTech competitive settings for your games, applied in one click"
+name = "fps-optimizer"
+version = "1.0.0-beta.mythos"
+description = "ChamberTech FPS Optimizer: competitive settings for your games, applied in one click"
 edition = "2021"
 publish = false
 

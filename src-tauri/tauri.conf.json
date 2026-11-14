@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Chamber Game Optimizer",
-  "version": "1.0.0-beta.5",
-  "identifier": "net.chambertech.gameoptimizer",
+  "productName": "FPS Optimizer",
+  "version": "1.0.0-beta.mythos",
+  "identifier": "net.chambertech.fpsoptimizer",
   "build": {
     "frontendDist": "../ui"
   },
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Chamber Game Optimizer",
+        "title": "FPS Optimizer",
         "width": 1100,
         "height": 720,
         "minWidth": 880,
@@ -21,7 +21,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://raw.githubusercontent.com https://api.github.com; img-src 'self'; font-src 'self'; style-src 'self'"
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://raw.githubusercontent.com https://api.github.com; img-src 'self'; font-src 'self'; style-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"
     }
   },
   "bundle": {

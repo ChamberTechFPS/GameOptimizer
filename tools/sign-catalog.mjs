@@ -25,14 +25,23 @@ const keyAbs = realpathSync(keyResolved);
 const rel = relative(root, keyAbs);
 const insideRepo = rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
 if (insideRepo) {
-  fail("Refusing to sign: the private key is inside the repository.\nMove it outside the repo (for example F:\\GameOptimizer\\signing\\catalog-signing.key) and run this again.");
+  fail("Refusing to sign: the private key is inside the repository.\nMove it outside the repo, onto the removable media it lives on, and run this again.");
 }
 
+// A passphrase-protected key can't be read here without the passphrase, so openssl asks for it
+// and hands back only the public half.
 let modulus;
 try {
   modulus = modulusHexFromPem(readFileSync(keyAbs));
 } catch (e) {
-  fail(`Couldn't read that file as an RSA private key: ${e.message}`);
+  const pub = spawnSync("openssl", ["pkey", "-in", keyAbs, "-pubout"], { stdio: ["inherit", "pipe", "inherit"] });
+  if (pub.error?.code === "ENOENT") fail("openssl is not on PATH, and it is needed to read a passphrase-protected key.");
+  if (pub.status !== 0) fail(`Couldn't read that file as an RSA private key: ${e.message}`);
+  try {
+    modulus = modulusHexFromPem(pub.stdout);
+  } catch (e2) {
+    fail(`Couldn't read that file as an RSA private key: ${e2.message}`);
+  }
 }
 
 const trusted = readTrustedModuli().filter((k) => k.hex);

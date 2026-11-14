@@ -145,6 +145,11 @@ impl Engine {
 
     /// Keep a catalog the UI downloaded, if it verifies and is newer than anything seen before.
     pub fn install_catalog(&self, json: &[u8], sig: &[u8]) -> Result<&'static str, String> {
+        // The real catalog is tens of kilobytes and its signature 512 bytes. Refuse anything
+        // far past that before spending time on it.
+        if json.len() > MAX_CATALOG_BYTES || sig.len() > MAX_SIG_BYTES {
+            return Err("The config catalog is too large, so it wasn't used.".into());
+        }
         let new = catalog::parse_verified(json, sig)?;
         let mut state = self.load_state()?;
         let current = self.catalog().map(|c| c.version).unwrap_or(0).max(state.catalog_version);
@@ -377,9 +382,21 @@ impl Engine {
         let Some(applied) = gs.as_ref().and_then(|s| s.applied.clone()) else {
             return Err(format!("Nothing to revert for {}.", g.name));
         };
+        // state.json is a plain file anything running as the player can edit. Check every path
+        // in it before the first write, so a tampered entry can't aim a revert at another file.
+        if let Some(bad) = applied.files.iter().find(|f| !catalog::is_config_file(&f.path)) {
+            return Err(format!(
+                "Chamber's state file lists {}, which isn't a game settings file, so nothing was reverted. Your backups are in {}",
+                bad.path.display(),
+                self.data.join("backups").display()
+            ));
+        }
+        let backups = self.data.join("backups");
         for f in &applied.files {
             let Ok(bytes) = fs::read(&f.path) else { continue }; // file is gone: nothing to put back
-            let out = if f.exact && sha256_hex(&bytes) == f.written && f.backup.exists() {
+            // Only a backup inside Chamber's own backups folder is restored whole.
+            let own_backup = f.backup.starts_with(&backups) && catalog::is_config_file(&f.backup);
+            let out = if f.exact && own_backup && sha256_hex(&bytes) == f.written && f.backup.exists() {
                 fs::read(&f.backup).map_err(io)?
             } else {
                 // The game or player changed other things since; undo only Chamber's keys.
@@ -465,6 +482,9 @@ impl Engine {
             .ok_or_else(|| format!("Couldn't find {}'s settings folder.", g.name))
     }
 }
+
+const MAX_CATALOG_BYTES: usize = 4 * 1024 * 1024;
+const MAX_SIG_BYTES: usize = 1024;
 
 fn roots(pc: &Pc, install: Option<&Path>) -> HashMap<&'static str, PathBuf> {
     let mut roots = pc.roots.clone();
@@ -656,6 +676,45 @@ mod tests {
         assert_eq!(patch::ini_get(&text, "Latency", "Reflex"), None);
         assert_eq!(patch::ini_get(&text, "Audio", "Volume").as_deref(), Some("55"), "player's own change survives");
         assert_eq!(patch::ini_get(&text, "Video", "Name").as_deref(), Some("Player One"));
+    }
+
+    #[test]
+    fn revert_refuses_paths_a_tampered_state_file_points_at() {
+        let fx = fixture("tamper");
+        fx.engine.apply(&fx.cat, &fx.pc, "test-game").unwrap();
+        let victim = fx.root.join("victim.bat");
+        fs::write(&victim, "keep").unwrap();
+
+        // The state file is edited to aim the revert at another file.
+        let mut state = fx.engine.load_state().unwrap();
+        state.games.get_mut("test-game").unwrap().applied.as_mut().unwrap().files[0].path = victim.clone();
+        fx.engine.save_state(&state).unwrap();
+        let err = fx.engine.revert(&fx.cat, &fx.pc, "test-game").unwrap_err();
+        assert!(err.contains("isn't a game settings file"), "{err}");
+        assert_eq!(fs::read_to_string(&victim).unwrap(), "keep");
+
+        // A backup outside Chamber's folder is never copied over the game file: only the listed
+        // keys are put back.
+        let planted = fx.root.join("planted.ini");
+        fs::write(&planted, "[Evil]\r\nRun=1\r\n").unwrap();
+        let files = &mut state.games.get_mut("test-game").unwrap().applied.as_mut().unwrap().files;
+        files[0].path = fx.file.clone();
+        files[0].backup = planted;
+        fx.engine.save_state(&state).unwrap();
+        fx.engine.revert(&fx.cat, &fx.pc, "test-game").unwrap();
+        let text = fs::read_to_string(&fx.file).unwrap();
+        assert!(!text.contains("Evil"), "{text}");
+        assert_eq!(patch::ini_get(&text, "Video", "Shadows").as_deref(), Some("3"));
+        assert_eq!(patch::ini_get(&text, "Audio", "Volume").as_deref(), Some("80"));
+    }
+
+    #[test]
+    fn oversized_catalogs_are_refused_before_verification() {
+        let fx = fixture("oversize");
+        let err = fx.engine.install_catalog(&vec![b' '; MAX_CATALOG_BYTES + 1], &[0; 512]).unwrap_err();
+        assert!(err.contains("too large"), "{err}");
+        let err = fx.engine.install_catalog(b"{}", &vec![0; MAX_SIG_BYTES + 1]).unwrap_err();
+        assert!(err.contains("too large"), "{err}");
     }
 
     #[test]

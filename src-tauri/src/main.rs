@@ -126,5 +126,5 @@ fn main() {
             quit
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Chamber Game Optimizer");
+        .expect("error while running FPS Optimizer");
 }

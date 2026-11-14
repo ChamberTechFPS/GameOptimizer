@@ -101,21 +101,21 @@ console.error(`
 ${endings}
 
 Re-sign the current bytes with the RSA-4096 private key whose public modulus is
-CURRENT_MODULUS_HEX. That key stays offline at F:\\GameOptimizer\\signing\\catalog-signing.key.
+CURRENT_MODULUS_HEX. That key stays offline with the maintainer.
 Do not generate a new key unless that private key is lost.
 Never commit a private key or put one in CI secrets.
 
   node tools/build-catalog.mjs --check
-  node tools/sign-catalog.mjs F:\\GameOptimizer\\signing\\catalog-signing.key
+  node tools/sign-catalog.mjs <path-to-key>
 
 Or with openssl directly, from the repo root:
 
-  openssl dgst -sha256 -sign F:\\GameOptimizer\\signing\\catalog-signing.key -out catalog.json.sig catalog.json
+  openssl dgst -sha256 -sign <path-to-key> -out catalog.json.sig catalog.json
   node tools/verify-catalog.mjs
 
 Confirm the key first. The printed modulus must equal CURRENT_MODULUS_HEX (case insensitive, no Modulus= prefix):
 
-  openssl pkey -in F:\\GameOptimizer\\signing\\catalog-signing.key -pubout -outform DER | openssl rsa -pubin -inform DER -modulus -noout
+  openssl pkey -in <path-to-key> -pubout -outform DER | openssl rsa -pubin -inform DER -modulus -noout
 
 On Windows, Git's openssl is the same command. Pass the key path you actually use.
 Then run: cargo test --manifest-path src-tauri/Cargo.toml

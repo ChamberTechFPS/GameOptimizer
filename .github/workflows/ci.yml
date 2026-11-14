@@ -4,11 +4,15 @@ on:
   push:
   pull_request:
 
+# Read-only token: these jobs only build and test.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: catalog.json matches games/
         run: node tools/build-catalog.mjs --check
@@ -23,22 +27,23 @@ jobs:
           node --check ui/mock.js
           node --test tools/updates.test.mjs tools/catalog-crypto.test.mjs
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
+          toolchain: stable
           components: clippy
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: src-tauri
 
       # Includes every game file's validation. The one historical unsigned catalog
       # snapshot is allowed here; any other unsigned change fails. See RELEASING.md.
       - name: Engine tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
 
       # Same allowlist as the engine test. Release and test-build run this without the flag.
       - name: catalog signature matches the embedded keys
         run: node tools/verify-catalog.mjs --allow-known-unsigned
 
       - name: Lint
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings

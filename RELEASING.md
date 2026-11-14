@@ -1,4 +1,4 @@
-# Releasing Chamber Game Optimizer
+# Releasing ChamberTech FPS Optimizer
 
 The app only applies a catalog that verifies against a public key compiled into it, and it only downloads that catalog from the host in [`ui/hosts.json`](ui/hosts.json). Two things are still on you. Nobody else has the private key, and nobody else should create the public repo.
 
@@ -13,7 +13,7 @@ v1.0.0-beta.1 (about two downloads) trusts only the old RSA-3072 key. That priva
 
 ## The signing key
 
-`CURRENT_MODULUS_HEX` in `src-tauri/src/catalog.rs` is the offline RSA-4096 public key that `rebuild` trusts. The private key stays on the Windows PC at `F:\GameOptimizer\signing\catalog-signing.key`. It is not in this repo. `.gitignore` ignores `signing/` and `*.key`.
+`CURRENT_MODULUS_HEX` in `src-tauri/src/catalog.rs` is the offline RSA-4096 public key that `rebuild` trusts. The private key stays with the maintainer, passphrase-protected, on removable media that is only plugged in to sign. `<path-to-key>` below stands for wherever that is. Its real path is never written in this repo: once the repo is public, a path here tells malware where to look. It is not in this repo. `.gitignore` ignores `signing/` and `*.key`.
 
 The previous RSA-4096 private key (the one that signed commit `033c850`) is unavailable, so this branch does not trust that modulus. `SPARE_MODULUS_HEX` stays empty until the next rotation. Leave the old modulus out of both `CURRENT` and `SPARE`.
 
@@ -28,14 +28,14 @@ Do this when `games/*.json` changes, from the repo root, on the machine that has
 1. Confirm the key is the one the app embeds. The hex after `Modulus=` must equal `CURRENT_MODULUS_HEX` in `src-tauri/src/catalog.rs` (ignore case):
 
    ```bash
-   openssl pkey -in 'F:\GameOptimizer\signing\catalog-signing.key' -pubout -outform DER \
+   openssl pkey -in <path-to-key> -pubout -outform DER \
      | openssl rsa -pubin -inform DER -modulus -noout
    ```
 
    A traditional PKCS#1 PEM also works:
 
    ```bash
-   openssl rsa -in 'F:\GameOptimizer\signing\catalog-signing.key' -modulus -noout
+   openssl rsa -in <path-to-key> -modulus -noout
    ```
 
    If it does not match, stop. You have the wrong file. Pasting a different modulus into `CURRENT_MODULUS_HEX` means every build that already shipped this key will reject catalogs signed by the new key. Use the spare-key steps further down instead of swapping `CURRENT` out from under a release.
@@ -44,13 +44,13 @@ Do this when `games/*.json` changes, from the repo root, on the machine that has
 
    ```bash
    node tools/build-catalog.mjs --check
-   node tools/sign-catalog.mjs 'F:\GameOptimizer\signing\catalog-signing.key'
+   node tools/sign-catalog.mjs <path-to-key>
    ```
 
    The script runs this openssl command, then `node tools/verify-catalog.mjs`:
 
    ```bash
-   openssl dgst -sha256 -sign 'F:\GameOptimizer\signing\catalog-signing.key' -out catalog.json.sig catalog.json
+   openssl dgst -sha256 -sign <path-to-key> -out catalog.json.sig catalog.json
    ```
 
 3. Confirm, then commit **both** files. Do not open `catalog.json` in an editor first. Do not let a tool change its line endings.
@@ -110,12 +110,27 @@ While this repo is private, the releases request 404s and the app shows **Couldn
 
 1. Edit `games/<game>.json`.
 2. `node tools/build-catalog.mjs`
-3. `node tools/sign-catalog.mjs F:\GameOptimizer\signing\catalog-signing.key`
+3. `node tools/sign-catalog.mjs <path-to-key>`
 4. `node tools/verify-catalog.mjs` and `cargo test --manifest-path src-tauri/Cargo.toml`
 5. Commit `catalog.json` and `catalog.json.sig` together.
 6. Copy those two files, byte for byte, to the public catalog host.
 
 `version` in the catalog is a unix timestamp, chosen only when the games change, so two rebuilds of the same edit won't match. Sign the file the writer just produced. `--check` rebuilds nothing; CI uses it to prove `catalog.json` is the canonical LF bytes for `games/`.
+
+## Protect the signing key
+
+The key signs what every installed copy will apply, so treat it like a password to all of them.
+
+- Put a passphrase on it. This rewrites an unencrypted key as an encrypted one; delete the old file after checking the new one signs:
+
+  ```bash
+  openssl pkey -in <path-to-key> -aes-256-cbc -out <path-to-key>.enc
+  ```
+
+  `tools/sign-catalog.mjs` works with an encrypted key. openssl asks for the passphrase twice: once to read the public half, once to sign.
+- Keep it on removable media that is unplugged when you aren't signing, not on the PC you game and browse on.
+- Keep two backups in different places. Two earlier keys were lost, and each loss stranded installs.
+- Never write its real path in this repo, in an issue, or in a commit message.
 
 ## Rotating the signing key later
 
@@ -124,7 +139,7 @@ The app trusts `TRUSTED_MODULI` in `src-tauri/src/catalog.rs`: `CURRENT_MODULUS_
 1. Generate the next key **offline**. Don't put it in the repo or in CI.
 
    ```bash
-   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out catalog-signing-next.key
+   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -aes-256-cbc -out catalog-signing-next.key
    openssl pkey -in catalog-signing-next.key -pubout -outform DER \
      | openssl rsa -pubin -inform DER -modulus -noout
    ```

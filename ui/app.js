@@ -1,4 +1,4 @@
-// Chamber Game Optimizer UI: renders what the Rust engine reports and sends it actions.
+// FPS Optimizer UI: renders what the Rust engine reports and sends it actions.
 // The engine owns every decision about files; nothing here touches the disk.
 const { invoke } = window.__TAURI__.core;
 const $ = (id) => document.getElementById(id);
@@ -689,7 +689,10 @@ async function refreshCatalog() {
     [json, sig] = await Promise.all([hosts.catalogUrl, hosts.catalogSigUrl].map(async (url) => {
       const r = await fetch(url, { cache: "no-store" });
       if (!r.ok) throw new Error(httpFailure(url, r.status));
-      return Array.from(new Uint8Array(await r.arrayBuffer()));
+      const bytes = new Uint8Array(await r.arrayBuffer());
+      // The engine has the same limit; this keeps a huge download from crossing into it at all.
+      if (bytes.length > 4 * 1024 * 1024) throw new Error(`${hostOf(url)} sent a catalog that is too large.`);
+      return Array.from(bytes);
     }));
   } catch (e) {
     setChip("error", "Couldn't check for new configs", `${errText(e)} Using the configs already on this PC.`);

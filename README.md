@@ -1,8 +1,8 @@
-# Chamber Game Optimizer
+# ChamberTech FPS Optimizer
 
 Competitive settings for your games, applied in one click. Every change is backed up, and you can undo it exactly.
 
-I optimize gaming PCs at [ChamberTech](https://www.chambertech.net). This app does the part of that job that's the same on every PC. It finds your games, applies the settings I use for competitive play, and shows you every value it changes. It's the companion to the [Chamber Playbook](https://github.com/ChamberTechFPS/Chamber-Playbook): the playbook tunes Windows, this tunes your games.
+I optimize gaming PCs at [ChamberTech](https://www.chambertech.net). This app does the part of that job that's the same on every PC. It finds your games, applies the settings I use for competitive play, and shows you every value it changes. FPS Optimizer is the companion to the [ChamberTech Playbook](https://github.com/ChamberTechFPS/Playbook): the playbook tunes Windows, this tunes your games. Run the playbook first, then this.
 
 ## What it does
 
@@ -36,7 +36,7 @@ Each game shows my before and after once I've benchmarked it: average FPS and 1%
 - **Signed configs.** Config updates are signed with a key that never touches GitHub, so a hacked repo or account can't push configs to your PC. The app refuses anything unsigned or older than what it already has.
 - **Locked to config files.** A config can only point at settings files (`.ini`, `.cfg`, `.vcfg`, `.txt`, `.txt0`, `.txt1`, and Battlefield's `PROFSAVE_profile`) under your user folders or a game's install folder. System paths, `..` tricks, and programs are rejected before anything is read.
 - **Hands off running games.** The app won't write while a game is running.
-- **Backups first.** The first change to any file copies the original to `%LOCALAPPDATA%\ChamberTech\GameOptimizer\backups`.
+- **Backups first.** The first change to any file copies the original to `%LOCALAPPDATA%\ChamberTech\GameOptimizer\backups`. The folder kept its name from before the rename so existing backups still revert.
 - **No telemetry.**
 
 ## Terms
@@ -51,8 +51,8 @@ After the host exists:
 
 1. Edit or add `games/<game>.json`. Set `find.exe` (the exe's path inside the install folder) so the game turns up in players' own game folders. To finish a new game, see [`games/drafts/README.md`](games/drafts/README.md).
 2. Rebuild the catalog: `node tools/build-catalog.mjs`
-3. Sign it. Only the keyholder can do this. The private key lives offline (example path `F:\GameOptimizer\signing\catalog-signing.key`). Never commit `signing/` or `*.key`.
-   `node tools/sign-catalog.mjs F:\GameOptimizer\signing\catalog-signing.key`
+3. Sign it. Only the keyholder can do this. The private key lives offline, passphrase-protected, on removable media. Never commit `signing/` or `*.key`, and never write its real path in this repo.
+   `node tools/sign-catalog.mjs <path-to-key>`
 4. Run `node tools/verify-catalog.mjs` and `cargo test --manifest-path src-tauri/Cargo.toml`
 5. Commit `catalog.json` and `catalog.json.sig` together, push, and copy those two files, unchanged, to the public catalog host.
 
@@ -64,15 +64,19 @@ CI fails if `catalog.json` doesn't match `games/`, or if the signature doesn't v
 2. Tag it (`v1.0.1`, or `v1.0.0-beta.2`) and push the tag. The tag has to be `v` plus that version. CI builds the installer.
 3. A stable tag becomes a draft release. Review it and publish it. A tag with a hyphen becomes a prerelease. The app reads the releases list, not `/releases/latest`, because `/latest` hides prereleases. Stable builds ignore prereleases. A build whose own version is a prerelease sees newer betas.
 
-The installer isn't code-signed yet, so Windows SmartScreen warns on first run. Signing comes before public launch. Update checks 404 until the repo that holds the releases is public.
+Each release ships `SHA256SUMS.txt`, like the playbook does. The installer isn't code-signed yet, so Windows SmartScreen warns on first run. Signing comes before public launch.
+
+The workflows pin every action to a commit and the Tauri CLI to an exact version, and the build uses `Cargo.lock` as committed. Dependabot opens the PRs that move those pins.
+
+Upgrading from a Chamber Game Optimizer beta: uninstall the old app first. The new name installs beside it, and both would share the same settings and backups. Update checks 404 until the repo that holds the releases is public.
 
 ## Building from source
 
 You need [Rust](https://rustup.rs) and Node.
 
 - Test the engine: `cargo test --manifest-path src-tauri/Cargo.toml`
-- Run the app on Windows: `npx @tauri-apps/cli@2 dev`
-- Build the installer: `npx @tauri-apps/cli@2 build`
+- Run the app on Windows: `npx @tauri-apps/cli@2.12.4 dev`
+- Build the installer: `npx @tauri-apps/cli@2.12.4 build -- --locked`
 - Preview the UI in any browser with sample data: `python3 -m http.server --directory ui`
 
 ## Credits

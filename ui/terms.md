@@ -2,7 +2,7 @@
 
 Version 3 · Updated 2026-11-03
 
-Chamber Game Optimizer is made by ChamberTech LLC. I'm Campbell, and I run it. These terms are between you and ChamberTech LLC. When you click Accept, you agree to them. If you don't agree, click Decline and the app closes.
+FPS Optimizer is made by ChamberTech LLC. I'm Campbell, and I run it. These terms are between you and ChamberTech LLC. When you click Accept, you agree to them. If you don't agree, click Decline and the app closes.
 
 ## What the app does
 
