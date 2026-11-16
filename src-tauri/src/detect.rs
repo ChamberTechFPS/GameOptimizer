@@ -98,6 +98,18 @@ pub fn running_exes() -> HashSet<String> {
     }
 }
 
+/// The primary monitor's mode and the CPU's core counts, without the game-install probes.
+pub fn hardware() -> Vars {
+    #[cfg(windows)]
+    {
+        windows::hardware()
+    }
+    #[cfg(not(windows))]
+    {
+        Vars::default()
+    }
+}
+
 /// Install folder of a game inside one of the player's library folders: the shallowest folder
 /// up to four levels down that holds `exe`. Four levels covers a folder per launcher with that
 /// launcher's own layout inside, e.g. D:\Games\Steam\steamapps\common\<game> and
@@ -182,9 +194,13 @@ mod windows {
     use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
     use winreg::RegKey;
 
+    pub(super) fn hardware() -> Vars {
+        cpu_vars(display_vars())
+    }
+
     impl Pc {
         pub fn probe() -> Pc {
-            let mut pc = Pc { vars: cpu_vars(display_vars()), running: running_processes(), ..Pc::default() };
+            let mut pc = Pc { vars: hardware(), running: running_processes(), ..Pc::default() };
             use windows_sys::Win32::UI::Shell::{FOLDERID_Documents, FOLDERID_LocalAppData, FOLDERID_RoamingAppData, FOLDERID_SavedGames};
             for (token, id) in [
                 ("localappdata", &FOLDERID_LocalAppData),

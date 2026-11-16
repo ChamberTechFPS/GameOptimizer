@@ -4,6 +4,7 @@ mod catalog;
 mod detect;
 mod engine;
 mod patch;
+mod specs;
 mod tweaks;
 
 use detect::Pc;
@@ -119,6 +120,12 @@ async fn tweaks_reset(scope: String) -> Reply {
     Ok(json!({ "changed": tweaks::run(tweaks::Action::Reset, &scope)? }))
 }
 
+/// This PC's hardware for the specs panel. Read-only.
+#[tauri::command]
+async fn specs() -> Reply {
+    serde_json::to_value(specs::read()).map_err(|e| e.to_string())
+}
+
 fn main() {
     // The copy of the app started through the Windows permission prompt does one job and exits.
     if let Some(code) = tweaks::elevated_entry(&std::env::args().collect::<Vec<_>>()) {
@@ -149,6 +156,7 @@ fn main() {
             tweaks_scan,
             tweaks_apply,
             tweaks_reset,
+            specs,
             quit
         ])
         .run(tauri::generate_context!())

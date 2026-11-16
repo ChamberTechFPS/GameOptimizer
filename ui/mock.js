@@ -153,6 +153,13 @@
         return { id: p.id, name: p.name, summary: p.summary, total: tweaks.length, applied: tweaks.filter((t) => t.state === "applied").length, admin: tweaks.some((t) => t.admin), tweaks };
       }),
     }),
+    specs: () => ({
+      cpu: "AMD Ryzen 7 7800X3D 8-Core Processor", cores: 8, threads: 16,
+      gpus: [{ name: "NVIDIA GeForce RTX 4070 SUPER", vramGb: 12, driver: "560.94" }],
+      ramGb: 32, width: 2560, height: 1440, refresh: 240,
+      board: "ROG STRIX B650-A GAMING WIFI", boardMaker: "ASUSTeK COMPUTER INC.",
+      os: "Windows 11 Pro", osVersion: "24H2 · build 26100",
+    }),
     tweaks_apply: ({ profile }) => writeTweaks(profile, "set"),
     tweaks_reset: ({ scope }) => writeTweaks(scope, "default"),
     scan: () => ({ games: games.map(view), terms: mockState.terms, libraries: mockState.libraries }),

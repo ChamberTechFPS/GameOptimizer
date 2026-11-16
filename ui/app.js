@@ -48,6 +48,13 @@ function button(label, cls, onClick, iconName) {
   return b;
 }
 
+// Hover text. Anything worth a sentence lives here, so the screen itself stays short.
+function tip(node, text) {
+  if (text) node.dataset.tip = text;
+  else delete node.dataset.tip;
+  return node;
+}
+
 function tile(g, extra = "") {
   const t = el("div", `tile ${extra}`.trim(), g.tile);
   t.setAttribute("aria-hidden", "true");
@@ -96,39 +103,55 @@ function openUrl(url) {
 
 // ---------- status copy ----------
 
+// [label, tone, icon, hover text]
 function badgeFor(g) {
+  if (blocked(g)) return ["Running", "bad", "alert", blockText(g)];
   switch (g.status) {
-    case "optimized": return ["Optimized", "ok", "check"];
-    case "changed": return [`${g.differ} changed`, "warn", "alert"];
-    case "update": return ["New config", "violet", "download"];
-    case "manual": return ["Set in-game", "violet", "list"];
-    case "launch-once": return ["Not set up", "", null];
-    default: return ["Not optimized", "", null];
+    case "optimized": return ["Optimized", "ok", "check", ""];
+    case "changed": return [`${g.differ} changed`, "warn", "alert", "Changed since you applied. Re-apply puts them back."];
+    case "update": return ["New config", "violet", "download", "New settings since you applied."];
+    case "manual": return ["Set in-game", "violet", "list", `${g.name} keeps these on its servers, so they're set by hand.`];
+    case "launch-once": return ["Not set up", "", null, `Launch ${g.name} once so it creates its settings file, then rescan.`];
+    default: return ["Not optimized", "", null, ""];
   }
 }
 
-function proofLine(g) {
-  const p = g.proof;
-  return p ? `My test: 1% lows ${p.low1[0]} → ${p.low1[1]}` : "";
-}
-
+// The few words under a card's name: the tested gain when there is one, otherwise a count.
 function noteFor(g) {
+  const note = el("span", "card-note");
+  const p = g.proof;
   switch (g.status) {
-    case "optimized": return [g.appliedAt ? `Applied ${dateText(g.appliedAt)}` : "Already matches", ""];
-    case "changed": return ["Changed since you applied", ""];
-    case "update": return ["New settings since you applied", ""];
-    case "manual": return [`${plural(g.manual.length, "setting")} to set`, ""];
-    case "launch-once": return [`Launch ${g.name} once, then rescan`, ""];
-    default: return [proofLine(g) || `${plural(g.differ, "setting")} to change`, ""];
+    case "optimized":
+      note.textContent = g.appliedAt ? `Applied ${dateText(g.appliedAt)}` : "Already matches";
+      break;
+    case "changed":
+    case "update":
+      note.textContent = g.appliedAt ? `Applied ${dateText(g.appliedAt)}` : "";
+      break;
+    case "manual":
+      note.textContent = plural(g.manual.length, "setting");
+      break;
+    case "launch-once":
+      note.textContent = "Launch once, then rescan";
+      break;
+    case "not-optimized":
+      if (p) {
+        note.append(tip(el("span", "gain num", `1% lows ${p.low1[0]} → ${p.low1[1]}`), `Avg ${p.avg[0]} → ${p.avg[1]} FPS. ${p.rig}, ${p.method}.`));
+        break;
+      }
+    // falls through
+    default:
+      note.textContent = plural(g.differ, "setting");
   }
+  return note;
 }
 
 function badge(g) {
-  const [label, tone, ic] = badgeFor(g);
+  const [label, tone, ic, hint] = badgeFor(g);
   const b = el("span", `badge ${tone}`.trim());
   if (ic) b.append(icon(ic));
   b.append(label);
-  return b;
+  return tip(b, hint);
 }
 
 function runningWarning(g) {
@@ -143,7 +166,7 @@ function applyButton(label, cls, g) {
   const b = button(label, cls, () => apply(g));
   if (blocked(g)) {
     b.disabled = true;
-    b.title = blockText(g);
+    tip(b, blockText(g));
   }
   return b;
 }
@@ -166,28 +189,33 @@ function card(g) {
   const c = el("article", "card");
   const head = el("div", "card-head");
   const info = el("div", "card-info");
-  const whereEl = el("div", "card-where", where(g));
-  whereEl.title = g.location ?? "";
-  info.append(el("div", "card-name", g.name), whereEl);
-  head.append(tile(g, g.status === "optimized" ? "lit" : ""), info);
-
-  const status = el("div", "card-status");
-  const [note, noteCls] = noteFor(g);
-  status.append(badge(g), el("span", noteCls, note));
+  info.append(
+    tip(el("div", "card-name", g.name), g.location ?? ""),
+    el("div", "card-where", LAUNCHER[g.launcher] ?? g.launcher),
+  );
+  head.append(tile(g, g.status === "optimized" ? "lit" : ""), info, badge(g));
 
   const actions = el("div", "card-actions");
   if (g.status === "manual") {
-    actions.append(button("Open checklist", "", () => openDrawer(g.slug)));
+    actions.append(button("Checklist", "", () => openDrawer(g.slug)));
   } else {
     actions.append(button("Details", "btn-ghost", () => openDrawer(g.slug)));
     if (g.status === "optimized" && g.appliedAt) actions.append(revertButton(g));
     if (g.status === "changed") actions.append(applyButton("Re-apply", "btn-outline", g));
-    if (g.status === "update") actions.append(applyButton("Apply update", "btn-outline", g));
+    if (g.status === "update") actions.append(applyButton("Update", "btn-outline", g));
     if (g.status === "not-optimized") actions.append(applyButton("Optimize", "btn-outline", g));
   }
-  const warn = runningWarning(g);
-  c.append(head, status, ...(warn ? [warn] : []), actions);
+  const foot = el("div", "card-foot");
+  foot.append(noteFor(g), actions);
+  c.append(head, foot);
   return c;
+}
+
+// Share of the way there, as the bar under a hero number.
+function meter(id, done, total) {
+  const bar = $(id);
+  bar.style.width = total ? `${Math.round((done / total) * 100)}%` : "0";
+  bar.parentElement.classList.toggle("full", total > 0 && done === total);
 }
 
 function render() {
@@ -211,18 +239,22 @@ function render() {
     $("hero-num").textContent = `${optimized} of ${fileGames.length}`;
     $("hero-label").textContent = "games optimized";
   }
+  meter("hero-bar", optimized, fileGames.length);
   const all = $("optimize-all");
   all.hidden = todo.length === 0;
   all.textContent = `Optimize all (${todo.length})`;
+  const count = $("tab-games-count");
+  count.hidden = todo.length === 0;
+  count.textContent = todo.length;
 
-  $("library-count").textContent = `Your library · ${found.length} found`;
+  $("library-count").textContent = plural(found.length, "game");
   const grid = $("grid");
   grid.replaceChildren(...found.map(card));
   if (!found.length) {
     const empty = el("div", "empty");
     empty.append(
-      el("strong", null, "No supported games found yet"),
-      el("p", null, "Installed somewhere unusual? Open your library and point me at the folder."),
+      el("strong", null, "No supported games found"),
+      el("p", null, "Installed somewhere unusual? Add the folder."),
       button("Open library", "", openSheet),
     );
     grid.append(empty);
@@ -230,11 +262,11 @@ function render() {
 
   const nf = $("not-found");
   nf.hidden = missing.length === 0;
-  $("not-found-text").textContent = `Not found (${missing.length}): ${missing.map((g) => g.name).join(", ")}`;
+  $("not-found-text").textContent = `Not found · ${missing.map((g) => g.name).join(", ")}`;
   $("not-found-list").replaceChildren(...missing.map((g) => {
     const li = el("li", "row");
     const info = el("div", "row-info");
-    info.append(el("div", "card-name", g.name), el("div", "meta", `${LAUNCHER[g.launcher] ?? g.launcher} · not detected`));
+    info.append(el("div", "card-name", g.name), el("div", "meta", LAUNCHER[g.launcher] ?? g.launcher));
     li.append(tile(g, "sm"), info, button("Set folder", "btn-ghost", () => pickFolder(g), "folder"));
     return li;
   }));
@@ -250,8 +282,21 @@ function profileBadge(p) {
   const done = p.applied === p.total;
   const b = el("span", `badge ${done ? "ok" : ""}`.trim());
   if (done) b.append(icon("check"));
-  b.append(done ? "Applied" : p.applied ? `${p.applied} of ${p.total} applied` : "Not applied");
-  return b;
+  b.append(done ? "Applied" : p.applied ? `${p.applied} of ${p.total}` : "Off");
+  return tip(b, done ? "" : `${p.applied} of ${plural(p.total, "tweak")} applied`);
+}
+
+// One tweak on a profile card: a state mark and its name. Why it helps is the hover text.
+function tweakRow(t) {
+  const li = el("li", "tweak");
+  const mark = el("span", `state ${t.state}`);
+  if (t.state === "applied") mark.append(icon("check"));
+  li.append(mark, el("span", "tweak-name", t.name));
+  const extra = [
+    t.state === "other" ? "Set to something else right now." : "",
+    t.restart ? "Needs a restart." : "",
+  ].filter(Boolean).join(" ");
+  return tip(li, `${t.why}${extra ? ` ${extra}` : ""}`);
 }
 
 function resetButton(scope, label) {
@@ -270,27 +315,39 @@ function profileCard(p) {
   const c = el("article", "card");
   const head = el("div", "card-head");
   const info = el("div", "card-info");
-  info.append(el("div", "card-name", p.name), el("div", "card-summary", p.summary));
-  head.append(tile({ tile: initials(p.name) }, p.applied === p.total ? "lit" : ""), info);
+  // The first sentence fits the card; the whole summary is the hover text.
+  info.append(el("div", "card-name", p.name), el("div", "card-where", plural(p.total, "tweak")));
+  head.append(tile({ tile: initials(p.name) }, p.applied === p.total ? "lit" : ""), info, profileBadge(p));
+  const summary = tip(el("p", "card-summary", p.summary.split(". ")[0].replace(/\.$/, "")), p.summary);
 
-  const status = el("div", "card-status");
-  status.append(profileBadge(p), el("span", null, `${plural(p.total, "tweak")}${p.admin ? " · asks for administrator" : ""}`));
+  const list = el("ul", "tweak-list");
+  list.append(...p.tweaks.map(tweakRow));
 
+  const note = el("span", "card-note");
+  if (p.admin) note.append(tip(icon("shield"), "Windows asks for permission, because some of these apply to the whole PC."));
   const actions = el("div", "card-actions");
   actions.append(button("Details", "btn-ghost", () => openProfile(p.id)));
   if (touched(p)) actions.append(resetButton(p.id, "Reset"));
   if (p.applied < p.total) actions.append(button("Apply", "btn-outline", () => applyProfile(p)));
-  c.append(head, status, actions);
+  const foot = el("div", "card-foot");
+  foot.append(note, actions);
+  c.append(head, summary, list, foot);
   return c;
 }
 
 function renderTweaks() {
   $("tweaks").replaceChildren(...profiles.map(profileCard));
+  // Profiles share tweaks, so count each tweak once.
+  const unique = new Map(profiles.flatMap((p) => p.tweaks).map((t) => [t.id, t]));
+  const applied = [...unique.values()].filter((t) => t.state === "applied").length;
+  $("pc-num").textContent = unique.size ? `${applied} of ${unique.size}` : "–";
+  meter("pc-bar", applied, unique.size);
+
   const all = $("tweaks-reset-all");
   const armed = armedReset === "all";
-  all.hidden = !profiles.length;
-  all.textContent = armed ? "Confirm reset" : "Reset all to Windows defaults";
-  all.className = `btn ${armed ? "btn-danger" : "btn-ghost"}`;
+  all.hidden = !profiles.some(touched);
+  all.replaceChildren(...(armed ? [] : [icon("undo")]), armed ? "Confirm reset" : "Reset all");
+  all.className = `btn ${armed ? "btn-danger" : ""}`.trim();
 }
 
 function openProfile(id) {
@@ -304,9 +361,9 @@ function renderProfileDrawer(p) {
   const d = $("drawer");
   const head = el("div", "drawer-head");
   const titles = el("div", "titles");
-  const h = el("h2", null, `${p.name} profile`);
+  const h = el("h2", null, p.name);
   h.id = "drawer-title";
-  titles.append(h, el("div", "meta", `${plural(p.total, "Windows tweak")} · every value shown`));
+  titles.append(h, el("div", "meta", plural(p.total, "Windows tweak")));
   const close = el("button", "btn btn-ghost btn-icon");
   close.type = "button";
   close.setAttribute("aria-label", "Close");
@@ -316,11 +373,11 @@ function renderProfileDrawer(p) {
 
   const body = el("div", "drawer-body");
   const note = el("p", "note");
-  note.append(icon("shield"), "These are Windows registry settings. Reset puts each one back to the Windows default, whether this app or the playbook set it.");
+  note.append(icon("shield"), "Registry settings. Reset restores the Windows default for each, whoever set it.");
   const rows = [];
   for (const t of p.tweaks) {
-    const group = el("tr", "group");
-    const label = labelCell(t.name, `${t.why}${t.restart ? " Needs a restart." : ""}`);
+    const group = tip(el("tr", "group"), `${t.why}${t.restart ? " Needs a restart." : ""}`);
+    const label = el("td", null, t.name);
     label.colSpan = 3;
     group.append(label, el("td", t.state === "applied" ? "match" : "now", TWEAK_STATE[t.state] ?? t.state));
     rows.push(group);
@@ -333,7 +390,7 @@ function renderProfileDrawer(p) {
   body.append(note, settingsTable(rows, ["Setting", "Now", "Set to", "Windows default"]));
 
   const foot = el("div", "drawer-foot");
-  if (touched(p)) foot.append(resetButton(p.id, "Reset to Windows defaults"));
+  if (touched(p)) foot.append(resetButton(p.id, "Reset to defaults"));
   if (p.applied < p.total) foot.append(button(`Apply ${p.name}`, "btn-primary", () => applyProfile(p)));
   else foot.append(button("Close", "", () => d.close()));
   d.replaceChildren(head, body, foot);
@@ -359,10 +416,11 @@ function settingsTable(rows, headers) {
   return table;
 }
 
-function labelCell(label, why) {
-  const td = el("td", null, label);
-  if (why) td.append(el("span", "why", why));
-  return td;
+// A settings row: the label and values show, the reason is the row's hover text.
+function settingRow(cls, why, ...cells) {
+  const tr = tip(el("tr", cls), why);
+  tr.append(...cells);
+  return tr;
 }
 
 function renderDrawer() {
@@ -377,10 +435,10 @@ function renderDrawer() {
 
   const head = el("div", "drawer-head");
   const titles = el("div", "titles");
-  const h = el("h2", null, g.status === "manual" ? `${g.name} checklist` : `${g.name} details`);
+  const h = el("h2", null, g.name);
   h.id = "drawer-title";
   const sub = g.status === "manual"
-    ? `${plural(g.manual.length, "setting")} · set these in-game`
+    ? `${plural(g.manual.length, "setting")} · set in-game`
     : `${g.files.join(", ")} · ${plural(g.total, "setting")}`;
   titles.append(h, el("div", "meta", sub));
   const close = el("button", "btn btn-ghost btn-icon");
@@ -397,12 +455,8 @@ function renderDrawer() {
 
   if (g.status === "manual") {
     const note = el("p", "note");
-    note.append(icon("list"), `${g.name} keeps these on its servers, so I can't write them for you. Set them once in-game and they follow your account.`);
-    const rows = g.manual.map((s) => {
-      const tr = el("tr");
-      tr.append(labelCell(s.label, s.why), el("td", "want", s.value));
-      return tr;
-    });
+    note.append(icon("list"), `${g.name} keeps these on its servers. Set them once in-game and they follow your account.`);
+    const rows = g.manual.map((s) => settingRow("", s.why, el("td", null, s.label), el("td", "want", s.value)));
     body.append(note, settingsTable(rows, ["Setting", "Set to"]));
   } else {
     const warn = runningWarning(g);
@@ -412,19 +466,17 @@ function renderDrawer() {
     }
     const sorted = [...g.settings].sort((a, b) => a.match - b.match);
     const rows = sorted.map((s) => {
-      const tr = el("tr", s.match ? "match" : "");
       const want = el("td", "want");
       if (s.match) want.append(icon("check"), " ");
       want.append(s.want);
-      tr.append(labelCell(s.label, s.why), el("td", "now", s.now), want);
-      return tr;
+      return settingRow(s.match ? "match" : "", s.why, el("td", null, s.label), el("td", "now", s.now), want);
     });
     body.append(settingsTable(rows, ["Setting", "Now", "Chamber"]));
 
     const note = el("p", "note");
     note.append(icon("lock"), g.lock
-      ? `Locked after apply so ${g.name} can't undo it. Only these settings change. Your sensitivity, binds, and crosshair stay yours.`
-      : "Only these settings change. Your sensitivity, binds, and crosshair stay yours.");
+      ? `Only these change, then the file is locked so ${g.name} can't undo it. Sensitivity, binds and crosshair stay yours.`
+      : "Only these change. Sensitivity, binds and crosshair stay yours.");
     body.append(note);
   }
 
@@ -436,7 +488,7 @@ function renderDrawer() {
       el("div", "proof-num num", `Avg ${p.avg[0]} → ${p.avg[1]} FPS · 1% lows ${p.low1[0]} → ${p.low1[1]}`),
     );
   } else {
-    proof.append(el("div", "meta", "Not benchmarked yet. Numbers show up here once I've tested it."));
+    proof.append(el("div", "meta", "Not benchmarked yet."));
   }
   body.append(proof);
 
@@ -500,9 +552,7 @@ function renderLibraries() {
     const rows = view.libraries.map((path) => {
       const li = el("div", "row");
       const info = el("div", "row-info");
-      const meta = el("div", "card-name", path);
-      meta.title = path;
-      info.append(meta);
+      info.append(tip(el("div", "card-name", path), path));
       li.append(info, button("Remove", "btn-ghost", () => removeLibrary(path)));
       return li;
     });
@@ -519,7 +569,7 @@ function welcome(terms) {
     d.addEventListener("close", () => { if (!accepted) d.showModal(); });
 
     $("welcome-title").textContent = "Terms of use";
-    $("welcome-sub").textContent = "Read these before you start. Accept to use the app.";
+    $("welcome-sub").textContent = "Accept to use the app.";
     $("welcome-body").replaceChildren(...markdown(terms.md));
     $("welcome-foot").replaceChildren(
       button("Decline", "btn-ghost", () => invoke("quit")),
@@ -538,11 +588,10 @@ function welcome(terms) {
 
     function folders() {
       $("welcome-title").textContent = "Where your games are";
-      $("welcome-sub").textContent = "I already check the usual places. Add any others.";
+      $("welcome-sub").textContent = "Steam, Epic, Riot, Battle.net, EA and Ubisoft are found automatically.";
       const libs = el("div", "libs");
       $("welcome-body").replaceChildren(
-        el("p", null, "I look in Steam (every library drive), Epic, Riot, and Windows' list of installed apps, which covers Battle.net, EA, and Ubisoft."),
-        el("p", null, "Keep games somewhere else, like D:\\Games? Add that folder and I'll look through it, including a folder per launcher like D:\\Games\\Steam. You can change this later in Library."),
+        el("p", null, "Games somewhere else, like D:\\Games? Add the folder. You can change this later in Library."),
         libs,
       );
       renderLibraries();
@@ -558,8 +607,7 @@ function renderSheet() {
     const li = el("li", "row");
     const info = el("div", "row-info");
     const detail = g.folder ? `Your folder · ${g.folder}` : g.found ? where(g) : "Not detected";
-    const meta = el("div", "meta", detail);
-    meta.title = g.folder ?? g.location ?? "";
+    const meta = tip(el("div", "meta", detail), g.folder ?? g.location ?? "");
     info.append(el("div", "card-name", g.name), meta);
 
     const show = el("label", "show-toggle");
@@ -579,6 +627,7 @@ function renderSheet() {
 // ---------- actions (one engine call at a time) ----------
 
 function rerender() {
+  hideTip(); // the element under the pointer is about to be replaced
   render();
   renderTweaks();
   renderLibraries();
@@ -789,7 +838,7 @@ function openFolder(g, which) {
 function setChip(state, text, detail = "") {
   $("catalog-chip").dataset.state = state;
   $("catalog-text").textContent = text;
-  $("catalog-chip").title = detail;
+  tip($("catalog-chip"), detail);
 }
 
 function hostOf(url) {
@@ -823,7 +872,7 @@ async function loadHosts() {
 
 // The webview downloads; the engine verifies the signature before anything is used.
 async function refreshCatalog() {
-  setChip("checking", "Checking for new configs…");
+  setChip("checking", "Checking…", "Checking for new configs.");
   let json, sig;
   try {
     [json, sig] = await Promise.all([hosts.catalogUrl, hosts.catalogSigUrl].map(async (url) => {
@@ -835,15 +884,15 @@ async function refreshCatalog() {
       return Array.from(bytes);
     }));
   } catch (e) {
-    setChip("error", "Couldn't check for new configs", `${errText(e)} Using the configs already on this PC.`);
+    setChip("error", "Configs offline", `Couldn't check for new configs. ${errText(e)} Using the configs already on this PC.`);
     return;
   }
   try {
     const r = await invoke("install_catalog", { json, sig });
     if (r.status === "updated") await scan();
-    setChip("fresh", r.status === "updated" ? "New configs downloaded" : "Configs up to date");
+    setChip("fresh", r.status === "updated" ? "Configs updated" : "Up to date", r.status === "updated" ? "New configs were just downloaded." : "You have the latest configs.");
   } catch (e) {
-    setChip("error", "New configs were rejected", `${errText(e)} Using the configs already on this PC.`);
+    setChip("error", "Configs rejected", `New configs were rejected. ${errText(e)} Using the configs already on this PC.`);
   }
 }
 
@@ -853,8 +902,8 @@ function showUpdateError(detail) {
   chip.disabled = true;
   chip.dataset.state = "error";
   chip.classList.remove("chip-violet");
-  chip.textContent = "Couldn't check for updates";
-  chip.title = detail;
+  chip.textContent = "Update check failed";
+  tip(chip, detail);
   chip.onclick = null;
 }
 
@@ -883,14 +932,160 @@ async function checkAppUpdate() {
     chip.dataset.state = "available";
     chip.classList.add("chip-violet");
     chip.textContent = `v${choice.version} available`;
-    chip.title = "Open the release page";
+    tip(chip, "Open the release page");
     chip.onclick = () => openUrl(choice.url);
   } catch (e) {
     showUpdateError(errText(e));
   }
 }
 
+// ---------- hover text ----------
+
+const tipBox = $("tip");
+let tipFor = null;
+
+function hideTip() {
+  tipFor = null;
+  if (tipBox.matches(":popover-open")) tipBox.hidePopover();
+}
+
+function showTip(target) {
+  tipFor = target;
+  tipBox.textContent = target.dataset.tip;
+  // Shown again each time, so it lands above a dialog opened since the last one.
+  if (tipBox.matches(":popover-open")) tipBox.hidePopover();
+  tipBox.showPopover();
+  const at = target.getBoundingClientRect();
+  const box = tipBox.getBoundingClientRect();
+  // Centered over small things; lined up with the start of a wide row so it covers less.
+  const start = at.width > 320 ? at.left : at.left + at.width / 2 - box.width / 2;
+  const left = Math.min(Math.max(8, start), window.innerWidth - box.width - 8);
+  const above = at.top - box.height - 8;
+  tipBox.style.left = `${left}px`;
+  tipBox.style.top = `${above >= 8 ? above : at.bottom + 8}px`;
+}
+
+const tipTarget = (e) => (e.target instanceof Element ? e.target.closest("[data-tip]") : null);
+document.addEventListener("mouseover", (e) => {
+  const t = tipTarget(e);
+  if (t === tipFor) return;
+  if (t) showTip(t);
+  else hideTip();
+});
+document.addEventListener("focusin", (e) => {
+  const t = tipTarget(e);
+  if (t?.matches(":focus-visible")) showTip(t);
+});
+document.addEventListener("focusout", hideTip);
+document.addEventListener("mousedown", hideTip);
+document.addEventListener("scroll", hideTip, true);
+document.documentElement.addEventListener("mouseleave", hideTip);
+
+// ---------- tabs + specs panel ----------
+
+// Which tab and whether the specs panel is open survive a restart. Nothing else is stored here.
+function recall(key) {
+  try { return localStorage.getItem(`fps.${key}`); } catch { return null; }
+}
+function remember(key, value) {
+  try { localStorage.setItem(`fps.${key}`, value); } catch { /* the choice just won't persist */ }
+}
+
+function showTab(name) {
+  const tab = name === "pc" ? "pc" : "games";
+  for (const t of document.querySelectorAll(".tab")) {
+    const on = t.dataset.tab === tab;
+    t.setAttribute("aria-selected", String(on));
+    t.tabIndex = on ? 0 : -1;
+  }
+  $("panel-games").hidden = tab !== "games";
+  $("panel-pc").hidden = tab !== "pc";
+  document.querySelector("main").scrollTop = 0;
+  remember("tab", tab);
+}
+
+function showSpecs(open) {
+  document.body.classList.toggle("no-specs", !open);
+  $("specs-btn").setAttribute("aria-expanded", String(open));
+  remember("specs", open ? "open" : "closed");
+}
+
+let specs = null;
+
+// "12th Gen Intel(R) Core(TM) i7-12700K CPU @ 3.60GHz" reads better as "Intel Core i7-12700K".
+const cpuName = (s) => s
+  .replace(/\((R|TM|C)\)/gi, "")
+  .replace(/^\d+th Gen /i, "")
+  .replace(/\s+\d+-Core Processor$/i, "")
+  .replace(/\s+CPU\s*@.*$/i, "")
+  .replace(/\s+/g, " ")
+  .trim();
+
+// [icon, label, value, detail] per row. The panel and Copy both read from this.
+function specRows(s) {
+  const rows = [["cpu", "CPU", s.cpu ? cpuName(s.cpu) : "Unknown", `${plural(s.cores, "core")} · ${plural(s.threads, "thread")}`]];
+  for (const g of s.gpus) {
+    rows.push(["gpu", "GPU", g.name, [g.vramGb && `${g.vramGb} GB`, g.driver && `Driver ${g.driver}`].filter(Boolean).join(" · ")]);
+  }
+  if (!s.gpus.length) rows.push(["gpu", "GPU", "Unknown", ""]);
+  rows.push(["memory", "Memory", s.ramGb ? `${s.ramGb} GB` : "Unknown", ""]);
+  rows.push(["monitor", "Display", `${s.width} × ${s.height}`, `${s.refresh} Hz`]);
+  if (s.board) rows.push(["board", "Motherboard", s.board, s.boardMaker ?? ""]);
+  if (s.os) rows.push(["os", "Windows", s.os, s.osVersion ?? ""]);
+  return rows;
+}
+
+function renderSpecs() {
+  $("specs-copy").hidden = !specs;
+  if (!specs) {
+    $("specs-list").replaceChildren(el("p", "meta", "Couldn't read this PC's specs."));
+    return;
+  }
+  $("specs-list").replaceChildren(...specRows(specs).map(([ic, label, value, detail]) => {
+    const row = el("div", "spec");
+    const mark = el("span", "spec-icon");
+    mark.append(icon(ic));
+    row.append(mark, el("dt", null, label), el("dd", "spec-value", value));
+    if (detail) row.append(el("dd", "spec-sub num", detail));
+    return row;
+  }));
+}
+
+async function loadSpecs() {
+  try {
+    specs = await invoke("specs");
+  } catch {
+    specs = null;
+  }
+  renderSpecs();
+}
+
+async function copySpecs() {
+  if (!specs) return;
+  const text = specRows(specs).map(([, label, value, detail]) => `${label}: ${value}${detail ? ` (${detail})` : ""}`).join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    toast("Specs copied", "ok");
+  } catch {
+    toast("Couldn't copy. A screenshot of the panel works too.", "error");
+  }
+}
+
 // ---------- wiring ----------
+
+for (const t of document.querySelectorAll(".tab")) {
+  t.onclick = () => showTab(t.dataset.tab);
+  t.onkeydown = (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const other = t.dataset.tab === "games" ? "pc" : "games";
+    showTab(other);
+    $(`tab-${other}`).focus();
+  };
+}
+showTab(recall("tab"));
+showSpecs(recall("specs") !== "closed");
+$("specs-btn").onclick = () => showSpecs(document.body.classList.contains("no-specs"));
+$("specs-copy").onclick = copySpecs;
 
 $("rescan-btn").onclick = () => run(scan);
 $("library-btn").onclick = openSheet;
@@ -914,6 +1109,7 @@ $("drawer").addEventListener("close", () => { drawerSlug = null; drawerProfile =
 (async () => {
   appVersion = await window.__TAURI__.app.getVersion().catch(() => appVersion);
   $("version").textContent = appVersion;
+  loadSpecs();
   await scan();
   watchRunning();
   const terms = await loadTerms();
@@ -921,7 +1117,7 @@ $("drawer").addEventListener("close", () => { drawerSlug = null; drawerProfile =
   try {
     hosts = await loadHosts();
   } catch (e) {
-    setChip("error", "Couldn't check for new configs", errText(e));
+    setChip("error", "Configs offline", errText(e));
     showUpdateError(errText(e));
     return;
   }
