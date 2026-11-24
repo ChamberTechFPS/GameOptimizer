@@ -75,6 +75,7 @@
           </div>
           <button id="optimize-all" class="btn btn-primary btn-lg" type="button" hidden>Optimize all</button>
         </div>
+        <p class="apply-hint" id="apply-hint">After a major game update, launch the game once, then apply.</p>
 
         <div class="section-head">
           <span id="library-count">Scanning…</span>
@@ -112,16 +113,22 @@
   </div>
 
   <footer class="footbar">
-    <span class="safe" data-tip="Config files and Windows settings only. Nothing is injected into a game and nothing stays running."><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>Anti-cheat safe</span>
-    <span class="safe-more">Backed up first · One-click revert</span>
-    <nav class="socials" aria-label="ChamberTech on social media">
-      <button type="button" data-url="https://www.youtube.com/chambertech" aria-label="YouTube" data-tip="YouTube"><svg class="brand-icon" aria-hidden="true"><use href="#b-youtube"/></svg></button>
-      <button type="button" data-url="https://www.tiktok.com/@chambertech" aria-label="TikTok" data-tip="TikTok"><svg class="brand-icon" aria-hidden="true"><use href="#b-tiktok"/></svg></button>
-      <button type="button" data-url="https://x.com/ChamberTech_" aria-label="X" data-tip="X"><svg class="brand-icon" aria-hidden="true"><use href="#b-x"/></svg></button>
-      <button type="button" data-url="https://discord.gg/TG4djSaZ2w" aria-label="Discord" data-tip="Discord"><svg class="brand-icon" aria-hidden="true"><use href="#b-discord"/></svg></button>
-      <button type="button" data-url="https://github.com/ChamberTechFPS" aria-label="GitHub" data-tip="GitHub"><svg class="brand-icon" aria-hidden="true"><use href="#b-github"/></svg></button>
-    </nav>
-    <button type="button" class="site-link" data-url="https://www.chambertech.net/">chambertech.net</button>
+    <aside class="tune" id="tune-foot" aria-label="ChamberTech tune-up">
+      <p id="tune-foot-text">Want a full tune-up? ChamberTech's remote PC optimization goes beyond config files: BIOS, Windows, drivers and more.</p>
+      <button id="tune-foot-btn" type="button" class="btn btn-outline btn-sm" data-url="https://chambertech.net">Open chambertech.net</button>
+    </aside>
+    <div class="foot-row">
+      <span class="safe" data-tip="Config files and Windows settings only. Nothing is injected into a game and nothing stays running."><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>Anti-cheat safe</span>
+      <span class="safe-more">Backed up first · One-click revert</span>
+      <nav class="socials" aria-label="ChamberTech on social media">
+        <button type="button" data-url="https://www.youtube.com/chambertech" aria-label="YouTube" data-tip="YouTube"><svg class="brand-icon" aria-hidden="true"><use href="#b-youtube"/></svg></button>
+        <button type="button" data-url="https://www.tiktok.com/@chambertech" aria-label="TikTok" data-tip="TikTok"><svg class="brand-icon" aria-hidden="true"><use href="#b-tiktok"/></svg></button>
+        <button type="button" data-url="https://x.com/ChamberTech_" aria-label="X" data-tip="X"><svg class="brand-icon" aria-hidden="true"><use href="#b-x"/></svg></button>
+        <button type="button" data-url="https://discord.gg/TG4djSaZ2w" aria-label="Discord" data-tip="Discord"><svg class="brand-icon" aria-hidden="true"><use href="#b-discord"/></svg></button>
+        <button type="button" data-url="https://github.com/ChamberTechFPS" aria-label="GitHub" data-tip="GitHub"><svg class="brand-icon" aria-hidden="true"><use href="#b-github"/></svg></button>
+      </nav>
+      <button type="button" class="site-link" data-url="https://www.chambertech.net/">chambertech.net</button>
+    </div>
   </footer>
 
   <dialog id="drawer" class="drawer" aria-labelledby="drawer-title"></dialog>

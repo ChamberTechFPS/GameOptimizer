@@ -101,6 +101,19 @@ function openUrl(url) {
   window.__TAURI__.opener.openUrl(url).catch((e) => toast(errText(e), "error"));
 }
 
+// The footer holds the copy. The drawer reuses it after a successful apply, so the two stay the same.
+function tuneOffer() {
+  const box = el("aside", "tune tune-card");
+  box.setAttribute("aria-label", "ChamberTech tune-up");
+  const label = $("tune-foot-btn");
+  box.append(el("p", null, $("tune-foot-text").textContent), button(label.textContent, "btn-outline btn-sm", () => openUrl(label.dataset.url)));
+  return box;
+}
+
+function applyHint() {
+  return el("p", "apply-hint", $("apply-hint").textContent);
+}
+
 // ---------- status copy ----------
 
 // [label, tone, icon, hover text]
@@ -390,6 +403,7 @@ function renderProfileDrawer(p) {
   body.append(note, settingsTable(rows, ["Setting", "Now", "Set to", "Windows default"]));
 
   const foot = el("div", "drawer-foot");
+  if (p.applied === p.total && p.total > 0) foot.append(tuneOffer());
   if (touched(p)) foot.append(resetButton(p.id, "Reset to defaults"));
   if (p.applied < p.total) foot.append(button(`Apply ${p.name}`, "btn-primary", () => applyProfile(p)));
   else foot.append(button("Close", "", () => d.close()));
@@ -451,7 +465,6 @@ function renderDrawer() {
   head.append(close);
 
   const body = el("div", "drawer-body");
-  const foot = el("div", "drawer-foot");
 
   if (g.status === "manual") {
     const note = el("p", "note");
@@ -491,6 +504,10 @@ function renderDrawer() {
     proof.append(el("div", "meta", "Not benchmarked yet."));
   }
   body.append(proof);
+
+  const foot = el("div", "drawer-foot");
+  if (g.status === "optimized") foot.append(tuneOffer());
+  else if (actionable(g)) foot.append(applyHint());
 
   const openBtn = button("Open folder", "btn-ghost", () => openFolder(g, "config"), "folder");
   switch (g.status) {

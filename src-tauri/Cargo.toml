@@ -1,6 +1,6 @@
 [package]
 name = "fps-optimizer"
-version = "1.0.0-beta.6"
+version = "1.0.0-beta.7"
 description = "ChamberTech FPS Optimizer: competitive settings for your games, applied in one click"
 edition = "2021"
 publish = false
